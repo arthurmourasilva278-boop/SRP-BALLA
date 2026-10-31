@@ -239,11 +239,11 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     }
 });
 
-// --- COMANDOS TRADICIONAIS E PAINÉIS ---
+// --- COMANDOS TRADICIONAIS COM O PREFIXO '+' ---
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
-    if (message.content.startsWith('!antiraid')) {
+    if (message.content.startsWith('+antiraid')) {
         if (message.author.id !== OWNER_ID) {
             return message.reply("❌ **Acesso negado!** Só o chefe pode mexer na segurança da quebrada.");
         }
@@ -264,12 +264,12 @@ client.on('messageCreate', async (message) => {
             
             return message.reply({ embeds: [ligadoEmbed] });
         } else {
-            return message.reply(`Situação do Anti-Raid: **${antiRaidActive ? 'ATIVADO ✅' : 'DESATIVADO ❌'}**\nManda \`!antiraid on\` para blindar ou \`!antiraid off\` para desativar.`);
+            return message.reply(`Situação do Anti-Raid: **${antiRaidActive ? 'ATIVADO ✅' : 'DESATIVADO ❌'}**\nManda \`+antiraid on\` para blindar ou \`+antiraid off\` para desativar.`);
         }
     }
 
-    // --- PAINEL DE TICKET ATUALIZADO ---
-    if (message.content === '!painelticket') {
+    // --- PAINEL DE TICKET (+painelticket) ---
+    if (message.content === '+painelticket') {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply("Apenas administradores podem usar este comando.");
         }
@@ -287,7 +287,6 @@ client.on('messageCreate', async (message) => {
             )
             .setFooter({ text: `Desenvolvido por krozz • ${BOT_NAME}` });
 
-        // Categoria de Cima: Opções (Com Dúvidas, Outros e Falar com Gestão)
         const optionsMenu = new StringSelectMenuBuilder()
             .setCustomId('menu_opcoes')
             .setPlaceholder('Opções')
@@ -300,7 +299,6 @@ client.on('messageCreate', async (message) => {
                 { label: 'Booster', description: 'Benefícios de impulsionador', value: 'ticket_booster', emoji: '🚀' }
             ]);
 
-        // Categoria de Baixo: Facção (Com Solicitar Cargo em vez de Setagem)
         const factionMenu = new StringSelectMenuBuilder()
             .setCustomId('menu_faccao')
             .setPlaceholder('Facção')
@@ -319,7 +317,7 @@ client.on('messageCreate', async (message) => {
         await message.delete().catch(() => {});
     }
 
-    if (message.content === '!regras') {
+    if (message.content === '+regras') {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply("Apenas administradores podem usar este comando.");
         }
