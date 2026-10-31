@@ -292,7 +292,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // Insira o token do seu bot abaixo
-client.login('SEU_TOKEN_DO_BOT_AQUI');
+client.login(process.env.DISCORD_TOKEN)
 
 
 
