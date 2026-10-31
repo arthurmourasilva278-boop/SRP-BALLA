@@ -8,6 +8,20 @@ const {
     ChannelType, 
     PermissionsBitField 
 } = require('discord.js');
+const express = require('express');
+
+// --- 🌐 SERVIDOR WEB PARA O RENDER ---
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+  res.send('SRP | BALLA Bot está online e operando perfeitamente!');
+});
+
+app.listen(PORT, () => {
+  console.log(`Servidor web rodando na porta ${PORT}`);
+});
+// ------------------------------------
 
 const client = new Client({
     intents: [
@@ -21,10 +35,10 @@ const client = new Client({
 
 const BOT_NAME = "SRP | BALLA";
 const ROLE_BOOSTER_ID = "1565957334507987054";
-const WELCOME_CHANNEL_ID = "SEU_CANAL_DE_BEM_VINDO_ID"; // Substitua pelo ID do canal de bem-vindo
+const WELCOME_CHANNEL_ID = "1565919892291584030"; // ID do canal de entrada configurado
 
-// 👑 COLOQUE O SEU ID DO DISCORD AQUI (Somente você poderá ativar/desativar o Anti-Raid):
-const OWNER_ID = "SEU_ID_DE_DONO_AQUI"; 
+// 👑 SEU ID DO DISCORD (Apenas você poderá ativar/desativar o Anti-Raid):
+const OWNER_ID = "1230674913564823562"; 
 
 // --- 🛡️ SISTEMA ANTI-RAID AVANÇADO ---
 let antiRaidActive = true; // Status do Anti-Raid (Ativado por padrão)
@@ -132,7 +146,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     }
 });
 
-client.once('ready', () => {
+client.once('clientReady', () => {
     console.log(`Bot ${BOT_NAME} ligado com segurança avançada como ${client.user.tag}!`);
 });
 
@@ -291,8 +305,5 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-// Insira o token do seu bot abaixo
-client.login(process.env.DISCORD_TOKEN)
-
-
-
+// Faz o login utilizando a variável de ambiente segura configurada no Render (DISCORD_TOKEN)
+client.login(process.env.DISCORD_TOKEN);
