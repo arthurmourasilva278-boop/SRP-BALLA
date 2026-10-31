@@ -1,1 +1,14 @@
+{
+  "name": "srp-balla",
+  "version": "1.0.0",
+  "description": "Bot SRP BALLA",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.0",
+    "dotenv": "^16.4.5"
+  }
+}
 
