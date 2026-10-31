@@ -7,7 +7,8 @@ const {
     StringSelectMenuBuilder,
     ButtonStyle, 
     ChannelType, 
-    PermissionsBitField 
+    PermissionsBitField,
+    AuditLogEvent 
 } = require('discord.js');
 const express = require('express');
 
@@ -30,7 +31,8 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildBans
+        GatewayIntentBits.GuildBans,
+        GatewayIntentBits.AutoModerationConfiguration
     ]
 });
 
@@ -44,15 +46,19 @@ const OWNER_ID = "1230674913564823562";
 // --- 🛡️ SISTEMA ANTI-RAID AVANÇADO ---
 let antiRaidActive = true; // Status do Anti-Raid (Ativado por padrão)
 const recentJoins = new Map();
-const ANTI_RAID_LIMIT = 5;       // Número máximo de entradas permitidas
-const ANTI_RAID_TIME = 10000;    // Janela de tempo em milissegundos (10 segundos)
-const MIN_ACCOUNT_AGE = 7 * 24 * 60 * 60 * 1000; // 7 dias em ms (contas novas suspeitas)
+const channelCreations = new Map();
+
+const ANTI_RAID_LIMIT = 5;       
+const ANTI_RAID_TIME = 10000;    
+const MIN_ACCOUNT_AGE = 7 * 24 * 60 * 60 * 1000; 
+
+const CHANNEL_CREATION_LIMIT = 3; 
+const CHANNEL_CREATION_TIME = 5000; 
 
 client.on('guildMemberAdd', async (member) => {
     const guild = member.guild;
     const now = Date.now();
 
-    // 🛡️ VERIFICA SE O ANTI-RAID ESTÁ ATIVADO PELO DONO
     if (antiRaidActive) {
         // 1. ANÁLISE DE CONTA NOVA (Anti-Alt/Bot)
         const accountAge = now - member.user.createdTimestamp;
@@ -60,11 +66,16 @@ client.on('guildMemberAdd', async (member) => {
             try {
                 await member.kick("Anti-Raid Avançado: Conta muito nova (suspeita de bot/raid).");
                 
-                const logChannel = guild.systemChannel;
+                const logChannel = guild.systemChannel || guild.channels.cache.get(WELCOME_CHANNEL_ID);
                 if (logChannel) {
-                    logChannel.send(`🛡️ **[ANTI-RAID]** Anti-raid ativado. Quem tentar não vai conseguir, vai ser kickado na hora e vai tomar. (Conta bloqueada: **${member.user.tag}**).`);
+                    const griaEmbed = new EmbedBuilder()
+                        .setColor('#FF0000')
+                        .setTitle(`🚨 TRETAS DETECTADAS NO CORRE! 🚨`)
+                        .setDescription(`Anti-raid ativado. Quem tentar não vai conseguir, vai ser kickado na hora e vai tomar.\n\n> **Maluco barrado:** ${member.user.tag} (Conta cria nova demais, mandado pra fora na marra!).`)
+                        .setTimestamp();
+                    logChannel.send({ embeds: [griaEmbed] });
                 }
-                return; // Interrompe para não mandar boas-vindas nem dar cargos
+                return; 
             } catch (e) {
                 console.error("Erro ao expulsar conta nova no anti-raid:", e);
             }
@@ -82,19 +93,19 @@ client.on('guildMemberAdd', async (member) => {
         recentJoins.set(guild.id, recent);
 
         if (recent.length >= ANTI_RAID_LIMIT) {
-            const alertChannel = guild.systemChannel;
+            const alertChannel = guild.systemChannel || guild.channels.cache.get(WELCOME_CHANNEL_ID);
             if (alertChannel) {
                 const raidEmbed = new EmbedBuilder()
                     .setColor('#FF0000')
-                    .setTitle(`🚨 ALERTA MÁXIMO DE RAID DETECTADA! 🚨`)
-                    .setDescription(`Anti-raid ativado. Quem tentar não vai conseguir, vai ser kickado na hora e vai tomar. (${recent.length} membros detetados em segundos).`)
+                    .setTitle(`🚨 VISÃO! OS INVASOR TENTARAM BROTAR! 🚨`)
+                    .setDescription(`Anti-raid ativado. Quem tentar não vai conseguir, vai ser kickado na hora e vai tomar.\n\nFluxo anormal de **${recent.length} cabaços** em segundos. O servidor fechou a banca e ativou o modo blindado!`)
                     .setTimestamp();
                 
                 alertChannel.send({ embeds: [raidEmbed] });
             }
 
             try {
-                await guild.setVerificationLevel(4); // Eleva a segurança do servidor
+                await guild.setVerificationLevel(4);
             } catch (e) {
                 console.error("Não foi possível alterar o nível de verificação automaticamente:", e);
             }
@@ -136,6 +147,56 @@ client.on('guildMemberAdd', async (member) => {
     }
 });
 
+// 🛡️ DETETO CRIAÇÃO EM MASSA DE CANAIS E BANE O UTILIZADOR NA MARRA
+client.on('guildChannelCreate', async (channel) => {
+    if (!antiRaidActive) return;
+    const guild = channel.guild;
+
+    try {
+        const fetchedLogs = await guild.fetchAuditLogs({
+            limit: 1,
+            type: AuditLogEvent.ChannelCreate,
+        });
+
+        const channelLog = fetchedLogs.entries.first();
+        if (!channelLog) return;
+
+        const { executor } = channelLog;
+        if (!executor || executor.bot || executor.id === OWNER_ID) return;
+
+        const now = Date.now();
+        if (!channelCreations.has(executor.id)) {
+            channelCreations.set(executor.id, []);
+        }
+
+        const userTimestamps = channelCreations.get(executor.id);
+        userTimestamps.push(now);
+
+        const windowStart = now - CHANNEL_CREATION_TIME;
+        const recentCreations = userTimestamps.filter(time => time > windowStart);
+        channelCreations.set(executor.id, recentCreations);
+
+        if (recentCreations.length >= CHANNEL_CREATION_LIMIT) {
+            const memberToBan = await guild.members.fetch(executor.id).catch(() => null);
+            if (memberToBan) {
+                await memberToBan.ban({ reason: "Anti-Raid: Tentativa de criação em massa de canais." });
+
+                const alertChannel = guild.systemChannel || guild.channels.cache.get(WELCOME_CHANNEL_ID);
+                if (alertChannel) {
+                    const banEmbed = new EmbedBuilder()
+                        .setColor('#FF0000')
+                        .setTitle(`🚨 TENTARAM Bugar A BASE E DANÇARAM! 🚨`)
+                        .setDescription(`Anti-raid ativado. Quem tentar não vai conseguir, vai ser kickado na hora e vai tomar.\n\nO comédia do **${executor.tag}** achou que ia lotar de canal e tomou **BAN PERMANENTE** na hora! ⚡`);
+                    
+                    alertChannel.send({ embeds: [banEmbed] });
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Erro no sistema anti-raid de canais:", e);
+    }
+});
+
 // Evento para quando impulsionar depois de entrar
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
     if (!oldMember.premiumSince && newMember.premiumSince) {
@@ -158,7 +219,7 @@ client.on('messageCreate', async (message) => {
     // 🔒 COMANDO EXCLUSIVO DO DONO PARA LIGAR/DESLIGAR O ANTI-RAID
     if (message.content.startsWith('!antiraid')) {
         if (message.author.id !== OWNER_ID) {
-            return message.reply("❌ **Acesso negado!** Apenas o dono do bot pode alterar as configurações do Anti-Raid.");
+            return message.reply("❌ **Acesso negado!** Só o chefe pode mexer na segurança da quebrada.");
         }
 
         const args = message.content.split(' ');
@@ -166,12 +227,19 @@ client.on('messageCreate', async (message) => {
 
         if (option === 'off' || option === 'desativar') {
             antiRaidActive = false;
-            return message.reply("🛡️ **Anti-Raid foi DESATIVADO** com sucesso pelo dono do bot.");
+            return message.reply("⚠️ **Anti-Raid desligado!** A firma tá vulnerável, cuidado.");
         } else if (option === 'on' || option === 'ativar') {
             antiRaidActive = true;
-            return message.reply("🛡️ **Anti-Raid foi ATIVADO** com sucesso pelo dono do bot. Quem tentar não vai conseguir, vai ser kickado na hora e vai tomar.");
+            
+            // Embed em gírias quando o dono liga o comando manualmente
+            const ligadoEmbed = new EmbedBuilder()
+                .setColor('#00FF00')
+                .setTitle(`🛡️ ESCUDO LIGADO! A FIRMA TÁ BLINDADA! 🛡️`)
+                .setDescription(`Anti-raid ativado. Quem tentar não vai conseguir, vai ser kickado na hora e vai tomar.`);
+            
+            return message.reply({ embeds: [ligadoEmbed] });
         } else {
-            return message.reply(`Status atual do Anti-Raid: **${antiRaidActive ? 'ATIVADO ✅' : 'DESATIVADO ❌'}**\nUse \`!antiraid on\` para ativar ou \`!antiraid off\` para desativar.`);
+            return message.reply(`Situação do Anti-Raid: **${antiRaidActive ? 'ATIVADO ✅' : 'DESATIVADO ❌'}**\nManda \`!antiraid on\` para blindar ou \`!antiraid off\` para desativar.`);
         }
     }
 
@@ -194,7 +262,6 @@ client.on('messageCreate', async (message) => {
             )
             .setFooter({ text: `Desenvolvido por krozz • ${BOT_NAME}` });
 
-        // Menu Dropdown para "Opções"
         const optionsMenu = new StringSelectMenuBuilder()
             .setCustomId('menu_opcoes')
             .setPlaceholder('Opções')
@@ -205,7 +272,6 @@ client.on('messageCreate', async (message) => {
                 { label: 'Booster', description: 'Benefícios de impulsionador', value: 'ticket_booster', emoji: '🚀' }
             ]);
 
-        // Menu Dropdown para "Facção"
         const factionMenu = new StringSelectMenuBuilder()
             .setCustomId('menu_faccao')
             .setPlaceholder('Facção')
@@ -261,7 +327,6 @@ client.on('messageCreate', async (message) => {
 
 // --- INTERAÇÃO DOS MENUS DROPDOWN E BOTÕES ---
 client.on('interactionCreate', async (interaction) => {
-    // Tratar seleções do Menu Dropdown
     if (interaction.isStringSelectMenu()) {
         const ticketType = interaction.values[0].replace('ticket_', '');
         const guild = interaction.guild;
