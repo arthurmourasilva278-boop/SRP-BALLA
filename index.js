@@ -1,3 +1,4 @@
+
 const { 
     Client, 
     GatewayIntentBits, 
@@ -8,7 +9,10 @@ const {
     ButtonStyle, 
     ChannelType, 
     PermissionsBitField,
-    AuditLogEvent 
+    AuditLogEvent,
+    REST,
+    Routes,
+    SlashCommandBuilder
 } = require('discord.js');
 const express = require('express');
 
@@ -31,20 +35,17 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildBans,
-        GatewayIntentBits.AutoModerationConfiguration
+        GatewayIntentBits.GuildBans
     ]
 });
 
 const BOT_NAME = "SRP | BALLA";
 const ROLE_BOOSTER_ID = "1565957334507987054";
 const WELCOME_CHANNEL_ID = "1565919892291584030"; // ID do canal de entrada configurado
-
-// 👑 COLOQUE O SEU ID DO DISCORD AQUI (Somente você poderá ativar/desativar o Anti-Raid):
 const OWNER_ID = "1230674913564823562"; 
 
 // --- 🛡️ SISTEMA ANTI-RAID AVANÇADO ---
-let antiRaidActive = true; // Status do Anti-Raid (Ativado por padrão)
+let antiRaidActive = true; 
 const recentJoins = new Map();
 const channelCreations = new Map();
 
@@ -55,12 +56,46 @@ const MIN_ACCOUNT_AGE = 7 * 24 * 60 * 60 * 1000;
 const CHANNEL_CREATION_LIMIT = 3; 
 const CHANNEL_CREATION_TIME = 5000; 
 
+// --- ⚡ DEFINIÇÃO DOS COMANDOS SLASH ---
+const commands = [
+    new SlashCommandBuilder()
+        .setName('alianca')
+        .setDescription('Envia a ficha de parceria/aliança.'),
+    new SlashCommandBuilder()
+        .setName('xfac')
+        .setDescription('Envia a ficha de desafio Xfac.'),
+    new SlashCommandBuilder()
+        .setName('transferencia')
+        .setDescription('Envia a ficha de transferência para a BALLA.'),
+    new SlashCommandBuilder()
+        .setName('rec')
+        .setDescription('Envia a ficha de recrutamento oficial da BALLA.')
+].map(command => command.toJSON());
+
+// Evento quando o bot está pronto
+client.once('clientReady', async () => {
+    console.log(`Bot ${BOT_NAME} ligado com segurança avançada como ${client.user.tag}!`);
+
+    // Registar Comandos Slash Globalmente
+    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+    try {
+        console.log('A registrar comandos Slash (/)...');
+        await rest.put(
+            Routes.applicationCommands(client.user.id),
+            { body: commands },
+        );
+        console.log('Comandos Slash registados com sucesso!');
+    } catch (error) {
+        console.error('Erro ao registrar comandos Slash:', error);
+    }
+});
+
+// --- 🛡️ EVENTO DE BOAS-VINDAS E ANTI-RAID ---
 client.on('guildMemberAdd', async (member) => {
     const guild = member.guild;
     const now = Date.now();
 
     if (antiRaidActive) {
-        // 1. ANÁLISE DE CONTA NOVA (Anti-Alt/Bot)
         const accountAge = now - member.user.createdTimestamp;
         if (accountAge < MIN_ACCOUNT_AGE) {
             try {
@@ -81,7 +116,6 @@ client.on('guildMemberAdd', async (member) => {
             }
         }
 
-        // 2. PROTEÇÃO CONTRA ENTRADA EM MASSA (Flood)
         if (!recentJoins.has(guild.id)) {
             recentJoins.set(guild.id, []);
         }
@@ -113,7 +147,6 @@ client.on('guildMemberAdd', async (member) => {
         }
     }
 
-    // 3. CARGO AUTOMÁTICO DE BOOSTER
     if (member.premiumSince) {
         try {
             await member.roles.add(ROLE_BOOSTER_ID);
@@ -122,7 +155,6 @@ client.on('guildMemberAdd', async (member) => {
         }
     }
 
-    // 4. MENSAGEM DE ENTRADA (WELCOME)
     const welcomeChannel = guild.channels.cache.get(WELCOME_CHANNEL_ID);
     if (welcomeChannel) {
         const welcomeEmbed = new EmbedBuilder()
@@ -147,7 +179,7 @@ client.on('guildMemberAdd', async (member) => {
     }
 });
 
-// 🛡️ DETETO CRIAÇÃO EM MASSA DE CANAIS E BANE O UTILIZADOR NA MARRA
+// 🛡️ ANTI-RAID: CRIAÇÃO DE CANAIS EM MASSA
 client.on('guildChannelCreate', async (channel) => {
     if (!antiRaidActive) return;
     const guild = channel.guild;
@@ -185,7 +217,7 @@ client.on('guildChannelCreate', async (channel) => {
                 if (alertChannel) {
                     const banEmbed = new EmbedBuilder()
                         .setColor('#FF0000')
-                        .setTitle(`🚨 TENTARAM Bugar A BASE E DANÇARAM! 🚨`)
+                        .setTitle(`🚨 TENTARAM BUGAR A BASE E DANÇARAM! 🚨`)
                         .setDescription(`Anti-raid ativado. Quem tentar não vai conseguir, vai ser kickado na hora e vai tomar.\n\nO comédia do **${executor.tag}** achou que ia lotar de canal e tomou **BAN PERMANENTE** na hora! ⚡`);
                     
                     alertChannel.send({ embeds: [banEmbed] });
@@ -197,7 +229,6 @@ client.on('guildChannelCreate', async (channel) => {
     }
 });
 
-// Evento para quando impulsionar depois de entrar
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
     if (!oldMember.premiumSince && newMember.premiumSince) {
         try {
@@ -208,15 +239,10 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     }
 });
 
-client.once('clientReady', () => {
-    console.log(`Bot ${BOT_NAME} ligado com segurança avançada como ${client.user.tag}!`);
-});
-
-// --- COMANDOS DO BOT ---
+// --- COMANDOS TRADICIONAIS E PAINÉIS ---
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
-    // 🔒 COMANDO EXCLUSIVO DO DONO PARA LIGAR/DESLIGAR O ANTI-RAID
     if (message.content.startsWith('!antiraid')) {
         if (message.author.id !== OWNER_ID) {
             return message.reply("❌ **Acesso negado!** Só o chefe pode mexer na segurança da quebrada.");
@@ -231,7 +257,6 @@ client.on('messageCreate', async (message) => {
         } else if (option === 'on' || option === 'ativar') {
             antiRaidActive = true;
             
-            // Embed em gírias quando o dono liga o comando manualmente
             const ligadoEmbed = new EmbedBuilder()
                 .setColor('#00FF00')
                 .setTitle(`🛡️ ESCUDO LIGADO! A FIRMA TÁ BLINDADA! 🛡️`)
@@ -243,7 +268,6 @@ client.on('messageCreate', async (message) => {
         }
     }
 
-    // Comando !painelticket com Menus Dropdown (Estilo Opções / Facção)
     if (message.content === '!painelticket') {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply("Apenas administradores podem usar este comando.");
@@ -290,7 +314,6 @@ client.on('messageCreate', async (message) => {
         await message.delete().catch(() => {});
     }
 
-    // Comando !regras
     if (message.content === '!regras') {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply("Apenas administradores podem usar este comando.");
@@ -325,8 +348,81 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// --- INTERAÇÃO DOS MENUS DROPDOWN E BOTÕES ---
+// --- 🎯 TRATAMENTO DOS COMANDOS SLASH E INTERAÇÕES ---
 client.on('interactionCreate', async (interaction) => {
+    // 1. EXECUÇÃO DOS COMANDOS SLASH
+    if (interaction.isChatInputCommand()) {
+        const { commandName } = interaction;
+
+        if (commandName === 'alianca') {
+            const aliancaMsg = 
+                `PARCERIA 🤝\n\n` +
+                `NOME FAC:\n\n` +
+                `QUANTOS MEMBROS:\n\n` +
+                `FAC OFICIAL: \n\n` +
+                `LIDER:`;
+            return await interaction.reply({ content: aliancaMsg });
+        }
+
+        if (commandName === 'xfac') {
+            const xfacMsg = 
+                `# xfac\n\n` +
+                `> Fac:\n\n` +
+                `> Valor:\n\n` +
+                `> Horário:\n\n` +
+                `> Quantos v quantos:\n\n` +
+                `> Regras:\n\n` +
+                `> Local: \n\n` +
+                `> Melhor de quantos:`;
+            return await interaction.reply({ content: xfacMsg });
+        }
+
+        if (commandName === 'transferencia') {
+            const transMsg = 
+                `TRANSFERÊNCIA PARA A BALLA\n\n` +
+                `**Olá, estarei realizando sua \n` +
+                `transferência!\n\n` +
+                `> Seu Nick:\n\n` +
+                `> Sua facção:\n\n` +
+                `> Cargo desejado:\n\n` +
+                `> Provas/ print :**`;
+            return await interaction.reply({ content: transMsg });
+        }
+
+        if (commandName === 'rec') {
+            const recMsg = 
+                `**RECRUTAMENTO | BALLA**\n\n` +
+                `📋 **IDENTIFICAÇÃO**\n\n` +
+                `👤 Nome:\n> \n\n` +
+                `🎂 Idade real:\n> \n\n` +
+                `🎮 Nick Roblox:\n> \n\n` +
+                `💬 Nick Discord:\n> \n\n` +
+                `⏰ Horário disponível:\n> \n\n` +
+                `🧁 Já participou de outra facção? Qual?\n> \n\n` +
+                `━━━━━━━━━━━━━━\n\n` +
+                `📜 **RP**\n\n` +
+                `🔫 RDM:\n> \n\n` +
+                `🕵️ CL:\n> \n\n` +
+                `🚗 VDM:\n> \n\n` +
+                `🌙 Dark RP:\n> \n\n` +
+                `🚫 Anti-RP:\n> \n\n` +
+                `━━━━━━━━━━━━━━\n\n` +
+                `👤 **PERFIL**\n\n` +
+                `🤿 O que é maturidade?\n> \n\n` +
+                `📊 Nota de maturidade (0-10):\n> \n\n` +
+                ` Por que entrar no Gangue do ovo roxo ?\n> \n\n` +
+                `💪 Melhor qualidade:\n> \n\n` +
+                `⚠️ Maior defeito:\n> \n\n` +
+                `🚔 Como reagiria a uma abordagem policial no RP?\n> \n\n` +
+                `━━━━━━━━━━━━━━\n\n` +
+                `🎧 **EXTRAS**\n\n` +
+                `🎙️ Possui microfone?\n> \n\n` +
+                `🎮 Joga em equipe ou sozinho?\n> `;
+            return await interaction.reply({ content: recMsg });
+        }
+    }
+
+    // 2. TRATAR SELEÇÕES DOS MENUS DROPDOWN (PAINEL DE TICKET)
     if (interaction.isStringSelectMenu()) {
         const ticketType = interaction.values[0].replace('ticket_', '');
         const guild = interaction.guild;
@@ -370,9 +466,8 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 
-    if (!interaction.isButton()) return;
-
-    if (interaction.customId === 'close_ticket') {
+    // 3. FECHAR TICKET POR BOTAO
+    if (interaction.isButton() && interaction.customId === 'close_ticket') {
         const channel = interaction.channel;
         await interaction.reply({ content: '🔒 Fechando ticket em 5 segundos...' });
         setTimeout(() => {
@@ -381,5 +476,6 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-// Faz o login utilizando a variável de ambiente segura configurada no Render (DISCORD_TOKEN)
+// Login do bot
 client.login(process.env.DISCORD_TOKEN);
+
