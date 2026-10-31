@@ -268,6 +268,7 @@ client.on('messageCreate', async (message) => {
         }
     }
 
+    // --- PAINEL DE TICKET ATUALIZADO ---
     if (message.content === '!painelticket') {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply("Apenas administradores podem usar este comando.");
@@ -286,16 +287,20 @@ client.on('messageCreate', async (message) => {
             )
             .setFooter({ text: `Desenvolvido por krozz • ${BOT_NAME}` });
 
+        // Categoria de Cima: Opções (Com Dúvidas, Outros e Falar com Gestão)
         const optionsMenu = new StringSelectMenuBuilder()
             .setCustomId('menu_opcoes')
             .setPlaceholder('Opções')
             .addOptions([
-                { label: 'Sugestão', description: 'Enviar uma ideia para melhoria', value: 'ticket_sugestao', emoji: '💡' },
+                { label: 'Falar com gestão', description: 'Tratar assuntos diretamente com a gestão', value: 'ticket_gestao', emoji: '🗣️' },
+                { label: 'Dúvidas', description: 'Tirar dúvidas gerais sobre a facção/servidor', value: 'ticket_duvidas', emoji: '❓' },
+                { label: 'Outros', description: 'Outros assuntos não especificados', value: 'ticket_outros', emoji: '📌' },
                 { label: 'Alianças', description: 'Tratar sobre parcerias', value: 'ticket_aliancas', emoji: '🛡️' },
                 { label: 'Denúncias', description: 'Reportar infrações', value: 'ticket_denuncias', emoji: '🚨' },
                 { label: 'Booster', description: 'Benefícios de impulsionador', value: 'ticket_booster', emoji: '🚀' }
             ]);
 
+        // Categoria de Baixo: Facção (Com Solicitar Cargo em vez de Setagem)
         const factionMenu = new StringSelectMenuBuilder()
             .setCustomId('menu_faccao')
             .setPlaceholder('Facção')
@@ -303,7 +308,7 @@ client.on('messageCreate', async (message) => {
                 { label: 'Xfac', description: 'Negociações e acordos entre facções', value: 'ticket_xfac', emoji: '🤝' },
                 { label: 'Transferência', description: 'Mudança de fac ou setor', value: 'ticket_transferencia', emoji: '🔄' },
                 { label: 'Pagar Metas', description: 'Envio de provas de metas', value: 'ticket_pagarmetas', emoji: '💰' },
-                { label: 'Setagem', description: 'Ajustes de cargos/setor', value: 'ticket_setagem', emoji: '⚙️' },
+                { label: 'Solicitar cargo', description: 'Pedir ou ajustar seus cargos/setor', value: 'ticket_solicitar_cargo', emoji: '🏷️' },
                 { label: 'Recrutamento', description: 'Informações para entrada na fac', value: 'ticket_recrutamento', emoji: '📥' }
             ]);
 
@@ -454,7 +459,7 @@ client.on('interactionCreate', async (interaction) => {
 
             const openedEmbed = new EmbedBuilder()
                 .setColor('#800080')
-                .setTitle(`Ticket: ${ticketType.toUpperCase()}`)
+                .setTitle(`Ticket: ${ticketType.toUpperCase().replace('_', ' ')}`)
                 .setDescription(`Olá ${member}, seu ticket foi aberto com sucesso!\nExplique o motivo do seu contato e aguarde a equipe responsável (${BOT_NAME}).`);
 
             await ticketChannel.send({ content: `${member}`, embeds: [openedEmbed], components: [closeRow] });
