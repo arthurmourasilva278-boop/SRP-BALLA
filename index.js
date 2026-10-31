@@ -41,13 +41,14 @@ const client = new Client({
 
 const BOT_NAME = "SRP | BALLA";
 const ROLE_BOOSTER_ID = "1565957334507987054";
-const WELCOME_CHANNEL_ID = "1565919892291584030"; // ID do canal de entrada configurado
+const WELCOME_CHANNEL_ID = "1565919892291584030";
 const OWNER_ID = "1230674913564823562"; 
 
 // --- 🛡️ SISTEMA ANTI-RAID AVANÇADO ---
 let antiRaidActive = true; 
 const recentJoins = new Map();
 const channelCreations = new Map();
+const activePoints = new Map();
 
 const ANTI_RAID_LIMIT = 5;       
 const ANTI_RAID_TIME = 10000;    
@@ -268,6 +269,22 @@ client.on('messageCreate', async (message) => {
         }
     }
 
+    // --- ⏱️ COMANDO +BATEPONTO ---
+    if (message.content === '+bateponto') {
+        const embed = new EmbedBuilder()
+            .setColor('#800080')
+            .setTitle(`⏱️ Sistema de Bate-Ponto — ${BOT_NAME}`)
+            .setDescription('Clique no botão abaixo para iniciar ou encerrar o seu ponto de serviço.');
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('ponto_iniciar').setLabel('Iniciar Ponto').setStyle(ButtonStyle.Success).setEmoji('🟢'),
+            new ButtonBuilder().setCustomId('ponto_encerrar').setLabel('Encerrar Ponto').setStyle(ButtonStyle.Danger).setEmoji('🔴')
+        );
+
+        await message.channel.send({ embeds: [embed], components: [row] });
+        await message.delete().catch(() => {});
+    }
+
     // --- PAINEL DE TICKET (+painelticket) ---
     if (message.content === '+painelticket') {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
@@ -425,7 +442,63 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 
-    // 2. TRATAR SELEÇÕES DOS MENUS DROPDOWN (PAINEL DE TICKET)
+    // 2. TRATAMENTO DOS BOTÕES DE BATE-PONTO
+    if (interaction.isButton()) {
+        const userId = interaction.user.id;
+        const now = Date.now();
+        const options = { timeZone: 'America/Sao_Paulo', dateStyle: 'long', timeStyle: 'short' };
+        const dataFormatada = new Intl.DateTimeFormat('pt-BR', options).format(now);
+
+        if (interaction.customId === 'ponto_iniciar') {
+            activePoints.set(userId, { startTime: now, startStr: dataFormatada });
+            return await interaction.reply({ content: `🟢 Ponto iniciado com sucesso às **${dataFormatada}**!`, ephemeral: true });
+        }
+
+        if (interaction.customId === 'ponto_encerrar') {
+            const pontoData = activePoints.get(userId);
+            if (!pontoData) {
+                return await interaction.reply({ content: `❌ Você não iniciou nenhum ponto ainda! Clique em "Iniciar Ponto" primeiro.`, ephemeral: true });
+            }
+
+            const diffMs = now - pontoData.startTime;
+            const diffSec = Math.floor(diffMs / 1000);
+            const minutes = Math.floor(diffSec / 60);
+            const hours = Math.floor(minutes / 60);
+            const displayMin = minutes % 60;
+            const displaySec = diffSec % 60;
+
+            let tempoTotalStr = '';
+            if (hours > 0) tempoTotalStr += `${hours} hora(s) `;
+            if (displayMin > 0 || hours > 0) tempoTotalStr += `${displayMin} minuto(s) `;
+            tempoTotalStr += `${displaySec} segundo(s)`;
+
+            const pontoEmbed = new EmbedBuilder()
+                .setColor('#800080')
+                .setTitle(`⏱️ Registo de Ponto — ${BOT_NAME}`)
+                .addFields(
+                    { name: 'Usuário:', value: `${interaction.user}`, inline: false },
+                    { name: 'Início:', value: `${pontoData.startStr}`, inline: false },
+                    { name: 'Termino:', value: `${dataFormatada}`, inline: false },
+                    { name: 'Tempo total:', value: `${tempoTotalStr}`, inline: false }
+                )
+                .setFooter({ text: `Sistema desenvolvido pela krozz • ${BOT_NAME}` })
+                .setTimestamp();
+
+            activePoints.delete(userId);
+            return await interaction.reply({ embeds: [pontoEmbed] });
+        }
+
+        // Fechar Ticket por botão
+        if (interaction.customId === 'close_ticket') {
+            const channel = interaction.channel;
+            await interaction.reply({ content: '🔒 Fechando ticket em 5 segundos...' });
+            setTimeout(() => {
+                channel.delete().catch(() => {});
+            }, 5000);
+        }
+    }
+
+    // 3. TRATAR SELEÇÕES DOS MENUS DROPDOWN (PAINEL DE TICKET)
     if (interaction.isStringSelectMenu()) {
         const ticketType = interaction.values[0].replace('ticket_', '');
         const guild = interaction.guild;
@@ -467,15 +540,6 @@ client.on('interactionCreate', async (interaction) => {
             console.error(error);
             await interaction.reply({ content: '❌ Ocorreu um erro ao criar o seu ticket.', ephemeral: true });
         }
-    }
-
-    // 3. FECHAR TICKET POR BOTAO
-    if (interaction.isButton() && interaction.customId === 'close_ticket') {
-        const channel = interaction.channel;
-        await interaction.reply({ content: '🔒 Fechando ticket em 5 segundos...' });
-        setTimeout(() => {
-            channel.delete().catch(() => {});
-        }, 5000);
     }
 });
 
