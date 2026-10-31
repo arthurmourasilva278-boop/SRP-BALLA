@@ -1,10 +1,10 @@
-
 const { 
     Client, 
     GatewayIntentBits, 
     EmbedBuilder, 
     ActionRowBuilder, 
     ButtonBuilder, 
+    StringSelectMenuBuilder,
     ButtonStyle, 
     ChannelType, 
     PermissionsBitField 
@@ -38,7 +38,7 @@ const BOT_NAME = "SRP | BALLA";
 const ROLE_BOOSTER_ID = "1565957334507987054";
 const WELCOME_CHANNEL_ID = "1565919892291584030"; // ID do canal de entrada configurado
 
-// 👑 SEU ID DO DISCORD (Apenas você poderá ativar/desativar o Anti-Raid):
+// 👑 COLOQUE O SEU ID DO DISCORD AQUI (Somente você poderá ativar/desativar o Anti-Raid):
 const OWNER_ID = "1230674913564823562"; 
 
 // --- 🛡️ SISTEMA ANTI-RAID AVANÇADO ---
@@ -62,7 +62,7 @@ client.on('guildMemberAdd', async (member) => {
                 
                 const logChannel = guild.systemChannel;
                 if (logChannel) {
-                    logChannel.send(`🛡️ **[ANTI-RAID]** Conta suspeita bloqueada automaticamente: **${member.user.tag}** (Criada há menos de 7 dias).`);
+                    logChannel.send(`🛡️ **[ANTI-RAID]** Anti-raid ativado. Quem tentar não vai conseguir, vai ser kickado na hora e vai tomar. (Conta bloqueada: **${member.user.tag}**).`);
                 }
                 return; // Interrompe para não mandar boas-vindas nem dar cargos
             } catch (e) {
@@ -87,7 +87,7 @@ client.on('guildMemberAdd', async (member) => {
                 const raidEmbed = new EmbedBuilder()
                     .setColor('#FF0000')
                     .setTitle(`🚨 ALERTA MÁXIMO DE RAID DETECTADA! 🚨`)
-                    .setDescription(`O sistema detectou um fluxo anormal de entradas (**${recent.length} membros** em poucos segundos).\nO servidor entrou em **Modo de Proteção Preventiva**!`)
+                    .setDescription(`Anti-raid ativado. Quem tentar não vai conseguir, vai ser kickado na hora e vai tomar. (${recent.length} membros detetados em segundos).`)
                     .setTimestamp();
                 
                 alertChannel.send({ embeds: [raidEmbed] });
@@ -169,13 +169,13 @@ client.on('messageCreate', async (message) => {
             return message.reply("🛡️ **Anti-Raid foi DESATIVADO** com sucesso pelo dono do bot.");
         } else if (option === 'on' || option === 'ativar') {
             antiRaidActive = true;
-            return message.reply("🛡️ **Anti-Raid foi ATIVADO** com sucesso pelo dono do bot.");
+            return message.reply("🛡️ **Anti-Raid foi ATIVADO** com sucesso pelo dono do bot. Quem tentar não vai conseguir, vai ser kickado na hora e vai tomar.");
         } else {
             return message.reply(`Status atual do Anti-Raid: **${antiRaidActive ? 'ATIVADO ✅' : 'DESATIVADO ❌'}**\nUse \`!antiraid on\` para ativar ou \`!antiraid off\` para desativar.`);
         }
     }
 
-    // Comando !painelticket
+    // Comando !painelticket com Menus Dropdown (Estilo Opções / Facção)
     if (message.content === '!painelticket') {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply("Apenas administradores podem usar este comando.");
@@ -184,32 +184,41 @@ client.on('messageCreate', async (message) => {
         const embed = new EmbedBuilder()
             .setColor('#800080')
             .setTitle(`🎟️ Central de Atendimento — ${BOT_NAME}`)
-            .setDescription('Selecione abaixo o motivo do seu atendimento clicando no botão correspondente:\n\n' +
-                          '• **Xfac** (Negociações/Acordos)\n' +
-                          '• **Transferência** (Mudança de fac/setor)\n' +
-                          '• **Pagar Metas** (Envio de provas de metas)\n' +
-                          '• **Sugestão** (Ideias para melhoria)\n' +
-                          '• **Alianças** (Parcerias)\n' +
-                          '• **Setagem** (Ajustes de cargos/setor)\n' +
-                          '• **Recrutamento** (Entrada na fac)\n' +
-                          '• **Denúncias** (Reportar infrações)\n' +
-                          '• **Booster** (Benefícios de impulsionador)')
-            .setFooter({ text: BOT_NAME });
+            .setDescription(
+                'Central de atendimento\n\n' +
+                '• Um canal privado será criado apenas para você\n\n' +
+                '• Apenas você e nossa equipe de suporte terá acesso\n\n' +
+                '• Nossa equipe responderá o mais rápido possível\n\n' +
+                'IMPORTANTE\n' +
+                '• Use o sistema de ticket apenas para questões que precisam de suporte'
+            )
+            .setFooter({ text: `Desenvolvido por krozz • ${BOT_NAME}` });
 
-        const row1 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('ticket_xfac').setLabel('Xfac').setStyle(ButtonStyle.Primary).setEmoji('🤝'),
-            new ButtonBuilder().setCustomId('ticket_transferencia').setLabel('Transferência').setStyle(ButtonStyle.Primary).setEmoji('🔄'),
-            new ButtonBuilder().setCustomId('ticket_pagarmetas').setLabel('Pagar Metas').setStyle(ButtonStyle.Success).setEmoji('💰'),
-            new ButtonBuilder().setCustomId('ticket_sugestao').setLabel('Sugestão').setStyle(ButtonStyle.Secondary).setEmoji('💡')
-        );
+        // Menu Dropdown para "Opções"
+        const optionsMenu = new StringSelectMenuBuilder()
+            .setCustomId('menu_opcoes')
+            .setPlaceholder('Opções')
+            .addOptions([
+                { label: 'Sugestão', description: 'Enviar uma ideia para melhoria', value: 'ticket_sugestao', emoji: '💡' },
+                { label: 'Alianças', description: 'Tratar sobre parcerias', value: 'ticket_aliancas', emoji: '🛡️' },
+                { label: 'Denúncias', description: 'Reportar infrações', value: 'ticket_denuncias', emoji: '🚨' },
+                { label: 'Booster', description: 'Benefícios de impulsionador', value: 'ticket_booster', emoji: '🚀' }
+            ]);
 
-        const row2 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('ticket_aliancas').setLabel('Alianças').setStyle(ButtonStyle.Primary).setEmoji('🛡️'),
-            new ButtonBuilder().setCustomId('ticket_setagem').setLabel('Setagem').setStyle(ButtonStyle.Secondary).setEmoji('⚙️'),
-            new ButtonBuilder().setCustomId('ticket_recrutamento').setLabel('Recrutamento').setStyle(ButtonStyle.Success).setEmoji('📥'),
-            new ButtonBuilder().setCustomId('ticket_denuncias').setLabel('Denúncias').setStyle(ButtonStyle.Danger).setEmoji('🚨'),
-            new ButtonBuilder().setCustomId('ticket_booster').setLabel('Booster').setStyle(ButtonStyle.Primary).setEmoji('🚀')
-        );
+        // Menu Dropdown para "Facção"
+        const factionMenu = new StringSelectMenuBuilder()
+            .setCustomId('menu_faccao')
+            .setPlaceholder('Facção')
+            .addOptions([
+                { label: 'Xfac', description: 'Negociações e acordos entre facções', value: 'ticket_xfac', emoji: '🤝' },
+                { label: 'Transferência', description: 'Mudança de fac ou setor', value: 'ticket_transferencia', emoji: '🔄' },
+                { label: 'Pagar Metas', description: 'Envio de provas de metas', value: 'ticket_pagarmetas', emoji: '💰' },
+                { label: 'Setagem', description: 'Ajustes de cargos/setor', value: 'ticket_setagem', emoji: '⚙️' },
+                { label: 'Recrutamento', description: 'Informações para entrada na fac', value: 'ticket_recrutamento', emoji: '📥' }
+            ]);
+
+        const row1 = new ActionRowBuilder().addComponents(optionsMenu);
+        const row2 = new ActionRowBuilder().addComponents(factionMenu);
 
         await message.channel.send({ embeds: [embed], components: [row1, row2] });
         await message.delete().catch(() => {});
@@ -250,12 +259,11 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// --- INTERAÇÃO DOS BOTÕES DE TICKET ---
+// --- INTERAÇÃO DOS MENUS DROPDOWN E BOTÕES ---
 client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isButton()) return;
-
-    if (interaction.customId.startsWith('ticket_')) {
-        const ticketType = interaction.customId.replace('ticket_', '');
+    // Tratar seleções do Menu Dropdown
+    if (interaction.isStringSelectMenu()) {
+        const ticketType = interaction.values[0].replace('ticket_', '');
         const guild = interaction.guild;
         const member = interaction.user;
 
@@ -296,6 +304,8 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.reply({ content: '❌ Ocorreu um erro ao criar o seu ticket.', ephemeral: true });
         }
     }
+
+    if (!interaction.isButton()) return;
 
     if (interaction.customId === 'close_ticket') {
         const channel = interaction.channel;
