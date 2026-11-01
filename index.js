@@ -61,12 +61,26 @@ const MIN_ACCOUNT_AGE = 7 * 24 * 60 * 60 * 1000;
 const CHANNEL_CREATION_LIMIT = 3; 
 const CHANNEL_CREATION_TIME = 5000; 
 
-// --- ⚡ DEFINIÇÃO DOS COMANDOS SLASH ---
+// --- ⚡ DEFINIÇÃO DE TODOS OS COMANDOS (AGORA 100% SLASH /) ---
 const commands = [
     new SlashCommandBuilder().setName('alianca').setDescription('Envia a ficha de parceria/aliança.'),
     new SlashCommandBuilder().setName('xfac').setDescription('Envia a ficha de desafio Xfac.'),
     new SlashCommandBuilder().setName('transferencia').setDescription('Envia a ficha de transferência para a BALLA.'),
     new SlashCommandBuilder().setName('rec').setDescription('Envia a ficha de recrutamento oficial da BALLA.'),
+    new SlashCommandBuilder().setName('regras').setDescription('Envia o painel de regras e punições da facção.'),
+    new SlashCommandBuilder().setName('painelticket').setDescription('Envia o painel central de atendimento e tickets.'),
+    new SlashCommandBuilder().setName('bateponto').setDescription('Envia o sistema interativo de bate-ponto.'),
+    new SlashCommandBuilder()
+        .setName('antiraid')
+        .setDescription('Liga ou desliga o sistema anti-raid da quebrada.')
+        .addStringOption(option => 
+            option.setName('estado')
+                .setDescription('Escolher entre ligar (on) ou desligar (off)')
+                .setRequired(true)
+                .addChoices(
+                    { name: 'Ativar (On)', value: 'on' },
+                    { name: 'Desativar (Off)', value: 'off' }
+                )),
     new SlashCommandBuilder()
         .setName('sorteio')
         .setDescription('Inicia um sorteio na quebrada.')
@@ -160,88 +174,11 @@ client.on('guildMemberRemove', async (member) => {
     }
 });
 
-// --- COMANDOS TRADICIONAIS E CANAL ARMADILHA (COM PRIORIDADE ABSOLUTA) ---
+// --- APENAS CANAL ARMADILHA NO MESSAGE CREATE ---
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
-    // 1. Processar Comandos com o prefixo '+' primeiro em qualquer canal
-    if (message.content.startsWith('+antiraid')) {
-        if (message.author.id !== OWNER_ID) {
-            return message.reply("❌ **Acesso negado!** Só o chefe pode mexer na segurança da quebrada.");
-        }
-        const args = message.content.split(' ');
-        const option = args[1]?.toLowerCase();
-        if (option === 'off' || option === 'desativar') {
-            antiRaidActive = false;
-            return message.reply("⚠️ **Anti-Raid desligado!**");
-        } else if (option === 'on' || option === 'ativar') {
-            antiRaidActive = true;
-            return message.reply({ embeds: [new EmbedBuilder().setColor('#00FF00').setTitle(`🛡️ ESCUDO LIGADO!`).setDescription(`Anti-raid ativado. Quem tentar fazer gracinha vai tomar!`)] });
-        } else {
-            return message.reply(`Situação do Anti-Raid: **${antiRaidActive ? 'ATIVADO ✅' : 'DESATIVADO ❌'}**`);
-        }
-    }
-
-    if (message.content === '+bateponto') {
-        const embed = new EmbedBuilder()
-            .setColor('#800080')
-            .setTitle(`⏱️ Sistema de Bate-Ponto — ${BOT_NAME}`)
-            .setDescription('Clique no botão abaixo para iniciar ou encerrar o seu ponto.');
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('ponto_iniciar').setLabel('Iniciar Ponto').setStyle(ButtonStyle.Success).setEmoji('🟢'),
-            new ButtonBuilder().setCustomId('ponto_encerrar').setLabel('Encerrar Ponto').setStyle(ButtonStyle.Danger).setEmoji('🔴')
-        );
-        await message.channel.send({ embeds: [embed], components: [row] });
-        await message.delete().catch(() => {});
-        return;
-    }
-
-    if (message.content === '+painelticket') {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply("Apenas administradores podem usar este comando.");
-        }
-        const embed = new EmbedBuilder()
-            .setColor('#800080')
-            .setTitle(`🎟️ Central de Atendimento — ${BOT_NAME}`)
-            .setDescription('Central de atendimento\n\n• Um canal privado será criado para você');
-        const optionsMenu = new StringSelectMenuBuilder()
-            .setCustomId('menu_opcoes')
-            .setPlaceholder('Opções')
-            .addOptions([
-                { label: 'Falar com gestão', value: 'ticket_gestao', emoji: '🗣️' },
-                { label: 'Dúvidas', value: 'ticket_duvidas', emoji: '❓' },
-                { label: 'Outros', value: 'ticket_outros', emoji: '📌' },
-                { label: 'Alianças', value: 'ticket_aliancas', emoji: '🛡️' },
-                { label: 'Denúncias', value: 'ticket_denuncias', emoji: '🚨' },
-                { label: 'Booster', value: 'ticket_booster', emoji: '🚀' }
-            ]);
-        const factionMenu = new StringSelectMenuBuilder()
-            .setCustomId('menu_faccao')
-            .setPlaceholder('Facção')
-            .addOptions([
-                { label: 'Xfac', value: 'ticket_xfac', emoji: '🤝' },
-                { label: 'Transferência', value: 'ticket_transferencia', emoji: '🔄' },
-                { label: 'Pagar Metas', value: 'ticket_pagarmetas', emoji: '💰' },
-                { label: 'Solicitar cargo', value: 'ticket_solicitar_cargo', emoji: '🏷️' },
-                { label: 'Recrutamento', value: 'ticket_recrutamento', emoji: '📥' }
-            ]);
-        await message.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(optionsMenu), new ActionRowBuilder().addComponents(factionMenu)] });
-        await message.delete().catch(() => {});
-        return;
-    }
-
-    if (message.content === '+regras') {
-        if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return message.reply("Apenas administradores podem usar este comando.");
-        }
-        const regrasEmbed = new EmbedBuilder().setColor('#800080').setTitle(`————————• REGRAS ——————————`).setDescription('• Proibido racismo\n• Respeitar a hierarquia\n• Siga as regras do RP');
-        const punicoesEmbed = new EmbedBuilder().setColor('#FF0000').setTitle(`————————• Punições ——————————`).setDescription('• Preconceitos: 1 a 7 dias');
-        await message.channel.send({ embeds: [regrasEmbed, punicoesEmbed] });
-        await message.delete().catch(() => {});
-        return;
-    }
-
-    // 2. Canal Armadilha (HoneyPot)
+    // Canal Armadilha (HoneyPot)
     if (message.channel.id === TRAP_CHANNEL_ID) {
         if (!IMMUNE_USERS.includes(message.author.id)) {
             try {
@@ -257,7 +194,7 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// --- 🎯 TRATAMENTO DE INTERAÇÕES (SLASH E BOTÕES) ---
+// --- 🎯 TRATAMENTO DE INTERAÇÕES (TODOS OS COMANDOS SLASH /) ---
 client.on('interactionCreate', async (interaction) => {
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
@@ -266,6 +203,76 @@ client.on('interactionCreate', async (interaction) => {
         if (commandName === 'xfac') return await interaction.reply({ content: `# xfac\n> Fac:\n> Valor:\n> Horário:\n> Quantos v quantos:\n> Regras:\n> Local:\n> Melhor de quantos:` });
         if (commandName === 'transferencia') return await interaction.reply({ content: `TRANSFERÊNCIA PARA A BALLA\n\n**Seu Nick:\nSua facção:\nCargo desejado:\nProvas/ print:**` });
         if (commandName === 'rec') return await interaction.reply({ content: `**RECRUTAMENTO | BALLA**\n👤 Nome:\n🎂 Idade real:\n🎮 Nick Roblox:` });
+
+        if (commandName === 'regras') {
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+                return await interaction.reply({ content: "❌ Apenas administradores podem enviar as regras!", ephemeral: true });
+            }
+            const regrasEmbed = new EmbedBuilder().setColor('#800080').setTitle(`————————• REGRAS ——————————`).setDescription('• Proibido racismo\n• Respeitar a hierarquia\n• Siga as regras do RP');
+            const punicoesEmbed = new EmbedBuilder().setColor('#FF0000').setTitle(`————————• Punições ——————————`).setDescription('• Preconceitos: 1 a 7 dias');
+            await interaction.channel.send({ embeds: [regrasEmbed, punicoesEmbed] });
+            return await interaction.reply({ content: "✅ Regras enviadas com sucesso!", ephemeral: true });
+        }
+
+        if (commandName === 'painelticket') {
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+                return await interaction.reply({ content: "❌ Apenas administradores podem enviar o painel!", ephemeral: true });
+            }
+            const embed = new EmbedBuilder()
+                .setColor('#800080')
+                .setTitle(`🎟️ Central de Atendimento — ${BOT_NAME}`)
+                .setDescription('Central de atendimento\n\n• Um canal privado será criado para você');
+            const optionsMenu = new StringSelectMenuBuilder()
+                .setCustomId('menu_opcoes')
+                .setPlaceholder('Opções')
+                .addOptions([
+                    { label: 'Falar com gestão', value: 'ticket_gestao', emoji: '🗣️' },
+                    { label: 'Dúvidas', value: 'ticket_duvidas', emoji: '❓' },
+                    { label: 'Outros', value: 'ticket_outros', emoji: '📌' },
+                    { label: 'Alianças', value: 'ticket_aliancas', emoji: '🛡️' },
+                    { label: 'Denúncias', value: 'ticket_denuncias', emoji: '🚨' },
+                    { label: 'Booster', value: 'ticket_booster', emoji: '🚀' }
+                ]);
+            const factionMenu = new StringSelectMenuBuilder()
+                .setCustomId('menu_faccao')
+                .setPlaceholder('Facção')
+                .addOptions([
+                    { label: 'Xfac', value: 'ticket_xfac', emoji: '🤝' },
+                    { label: 'Transferência', value: 'ticket_transferencia', emoji: '🔄' },
+                    { label: 'Pagar Metas', value: 'ticket_pagarmetas', emoji: '💰' },
+                    { label: 'Solicitar cargo', value: 'ticket_solicitar_cargo', emoji: '🏷️' },
+                    { label: 'Recrutamento', value: 'ticket_recrutamento', emoji: '📥' }
+                ]);
+            await interaction.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(optionsMenu), new ActionRowBuilder().addComponents(factionMenu)] });
+            return await interaction.reply({ content: "✅ Painel de tickets enviado com sucesso!", ephemeral: true });
+        }
+
+        if (commandName === 'bateponto') {
+            const embed = new EmbedBuilder()
+                .setColor('#800080')
+                .setTitle(`⏱️ Sistema de Bate-Ponto — ${BOT_NAME}`)
+                .setDescription('Clique no botão abaixo para iniciar ou encerrar o seu ponto.');
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('ponto_iniciar').setLabel('Iniciar Ponto').setStyle(ButtonStyle.Success).setEmoji('🟢'),
+                new ButtonBuilder().setCustomId('ponto_encerrar').setLabel('Encerrar Ponto').setStyle(ButtonStyle.Danger).setEmoji('🔴')
+            );
+            await interaction.channel.send({ embeds: [embed], components: [row] });
+            return await interaction.reply({ content: "✅ Bate-ponto enviado!", ephemeral: true });
+        }
+
+        if (commandName === 'antiraid') {
+            if (interaction.user.id !== OWNER_ID) {
+                return await interaction.reply({ content: "❌ **Acesso negado!** Só o chefe pode mexer na segurança da quebrada.", ephemeral: true });
+            }
+            const estado = interaction.options.getString('estado');
+            if (estado === 'off') {
+                antiRaidActive = false;
+                return await interaction.reply({ content: "⚠️ **Anti-Raid desligado!**", ephemeral: true });
+            } else {
+                antiRaidActive = true;
+                return await interaction.reply({ embeds: [new EmbedBuilder().setColor('#00FF00').setTitle(`🛡️ ESCUDO LIGADO!`).setDescription(`Anti-raid ativado. Quem tentar fazer gracinha vai tomar!`)] });
+            }
+        }
 
         if (commandName === 'sorteio') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
@@ -338,6 +345,39 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.customId === 'close_ticket') {
             await interaction.reply({ content: '🔒 Fechando ticket...' });
             setTimeout(() => interaction.channel.delete().catch(() => {}), 3000);
+        }
+    }
+
+    if (interaction.isStringSelectMenu()) {
+        const ticketType = interaction.values[0].replace('ticket_', '');
+        const guild = interaction.guild;
+        const member = interaction.user;
+
+        try {
+            const ticketChannel = await guild.channels.create({
+                name: `${ticketType}-${member.username}`,
+                type: ChannelType.GuildText,
+                permissionOverwrites: [
+                    { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+                    { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+                    { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels] }
+                ],
+            });
+
+            const closeRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('close_ticket').setLabel('Fechar Ticket').setStyle(ButtonStyle.Danger).setEmoji('🔒')
+            );
+
+            const openedEmbed = new EmbedBuilder()
+                .setColor('#800080')
+                .setTitle(`Ticket: ${ticketType.toUpperCase().replace('_', ' ')}`)
+                .setDescription(`Olá ${member}, seu ticket foi aberto com sucesso!\nExplique o motivo do seu contato e aguarde a equipe responsável (${BOT_NAME}).`);
+
+            await ticketChannel.send({ content: `${member}`, embeds: [openedEmbed], components: [closeRow] });
+            await interaction.reply({ content: `✅ Seu ticket foi aberto em: ${ticketChannel}`, ephemeral: true });
+
+        } catch (error) {
+            await interaction.reply({ content: '❌ Ocorreu um erro ao criar o seu ticket.', ephemeral: true });
         }
     }
 });
