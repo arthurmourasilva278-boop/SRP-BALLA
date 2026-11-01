@@ -52,6 +52,7 @@ let antiRaidActive = true;
 const recentJoins = new Map();
 const channelCreations = new Map();
 const activePoints = new Map();
+const giveawayParticipants = new Map(); // Armazenar participantes dos sorteios
 
 const ANTI_RAID_LIMIT = 5;       
 const ANTI_RAID_TIME = 10000;    
@@ -73,7 +74,18 @@ const commands = [
         .setDescription('Envia a ficha de transferência para a BALLA.'),
     new SlashCommandBuilder()
         .setName('rec')
-        .setDescription('Envia a ficha de recrutamento oficial da BALLA.')
+        .setDescription('Envia a ficha de recrutamento oficial da BALLA.'),
+    new SlashCommandBuilder()
+        .setName('sorteio')
+        .setDescription('Inicia um sorteio na quebrada.')
+        .addStringOption(option => 
+            option.setName('premio')
+                .setDescription('O que vai ser sorteado?')
+                .setRequired(true))
+        .addIntegerOption(option => 
+            option.setName('tempo')
+                .setDescription('Duração do sorteio em minutos')
+                .setRequired(true))
 ].map(command => command.toJSON());
 
 // Evento quando o bot está pronto
@@ -509,6 +521,80 @@ client.on('interactionCreate', async (interaction) => {
                 `🎮 Joga em equipe ou sozinho?\n> `;
             return await interaction.reply({ content: recMsg });
         }
+
+        // --- SISTEMA DE SORTEIO (/sorteio) ---
+        if (commandName === 'sorteio') {
+            if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+                return await interaction.reply({ content: "❌ Apenas administradores podem iniciar sorteios!", ephemeral: true });
+            }
+
+            const premio = interaction.options.getString('premio');
+            const tempoMinutos = interaction.options.getInteger('tempo');
+            const tempoMs = tempoMinutos * 60 * 1000;
+            const terminoTimestamp = Math.floor((Date.now() + tempoMs) / 1000);
+
+            const giveawayEmbed = new EmbedBuilder()
+                .setColor('#800080')
+                .setTitle(`🎉 SORTEIO — ${BOT_NAME} 🎉`)
+                .setDescription(
+                    `🎁 **Prêmio:** **${premio}**\n\n` +
+                    `👑 **Criado por:** ${interaction.user}\n` +
+                    `⏰ **Termina em:** <t:${terminoTimestamp}:R> (<t:${terminoTimestamp}:f>)\n\n` +
+                    `👇 Clica no botão abaixo para participar do corre!`
+                )
+                .setFooter({ text: `Participe e boa sorte!` })
+                .setTimestamp();
+
+            const giveawayRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('join_giveaway')
+                    .setLabel('Participar')
+                    .setStyle(ButtonStyle.Success)
+                    .setEmoji('🎉')
+            );
+
+            await interaction.reply({ content: `✅ Sorteio iniciado com sucesso!`, ephemeral: true });
+            const giveawayMessage = await interaction.channel.send({ embeds: [giveawayEmbed], components: [giveawayRow] });
+
+            // Inicializar lista de participantes para esta mensagem
+            giveawayParticipants.set(giveawayMessage.id, new Set());
+
+            // Temporizador para encerrar o sorteio
+            setTimeout(async () => {
+                const participantsSet = giveawayParticipants.get(giveawayMessage.id);
+                const participantsArray = Array.from(participantsSet || []);
+
+                if (participantsArray.length === 0) {
+                    const endedEmbed = new EmbedBuilder()
+                        .setColor('#FF0000')
+                        .setTitle(`🎉 SORTEIO ENCERRADO — ${BOT_NAME} 🎉`)
+                        .setDescription(`🎁 **Prêmio:** **${premio}**\n\n❌ **Nenhum maluco participou a tempo, sorteio cancelado!**`);
+                    
+                    await giveawayMessage.edit({ embeds: [endedEmbed], components: [] }).catch(() => {});
+                    giveawayParticipants.delete(giveawayMessage.id);
+                    return;
+                }
+
+                // Escolher vencedor aleatório
+                const winnerId = participantsArray[Math.floor(Math.random() * participantsArray.length)];
+                const winnerUser = await interaction.guild.members.fetch(winnerId).catch(() => null);
+
+                const winnerEmbed = new EmbedBuilder()
+                    .setColor('#00FF00')
+                    .setTitle(`🎉 SORTEIO ENCERRADO! 🎉`)
+                    .setDescription(
+                        `🎁 **Prêmio:** **${premio}**\n\n` +
+                        `🏆 **Vencedor:** ${winnerUser ? winnerUser : `<@${winnerId}>`}!\n\n` +
+                        `Parabéns, mandou bem no corre e faturou o prêmio! 🚀🔥`
+                    )
+                    .setTimestamp();
+
+                await giveawayMessage.edit({ embeds: [winnerEmbed], components: [] }).catch(() => {});
+                await giveawayMessage.reply(`🎉 Parabéns ${winnerUser ? winnerUser : `<@${winnerId}>`}! Você ganhou o prêmio **${premio}**! Chama no corre para resgatar! 🏆🔥`);
+                
+                giveawayParticipants.delete(giveawayMessage.id);
+            }, tempoMs);
+        }
     }
 
     if (interaction.isButton()) {
@@ -516,6 +602,22 @@ client.on('interactionCreate', async (interaction) => {
         const now = Date.now();
         const options = { timeZone: 'America/Sao_Paulo', dateStyle: 'long', timeStyle: 'short' };
         const dataFormatada = new Intl.DateTimeFormat('pt-BR', options).format(now);
+
+        // --- PARTICIPAR DO SORTEIO ---
+        if (interaction.customId === 'join_giveaway') {
+            const messageId = interaction.message.id;
+            if (!giveawayParticipants.has(messageId)) {
+                return await interaction.reply({ content: `❌ Este sorteio já terminou ou expirou!`, ephemeral: true });
+            }
+
+            const participantsSet = giveawayParticipants.get(messageId);
+            if (participantsSet.has(userId)) {
+                return await interaction.reply({ content: `⚠️ Você já está a participar deste sorteio! Fica tranquilo e aguarda o resultado.`, ephemeral: true });
+            }
+
+            participantsSet.add(userId);
+            return await interaction.reply({ content: `✅ Participação garantida com sucesso! Boa sorte no sorteio! 🍀`, ephemeral: true });
+        }
 
         if (interaction.customId === 'ponto_iniciar') {
             activePoints.set(userId, { startTime: now, startStr: dataFormatada });
