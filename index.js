@@ -323,7 +323,7 @@ client.on('interactionCreate', async (interaction) => {
                 return await interaction.reply({ content: "⚠️ **Anti-Raid desligado!**", ephemeral: true });
             } else {
                 antiRaidActive = true;
-                return await interaction.reply({ embeds: [new EmbedBuilder().setColor('#00FF00'].setTitle(`🛡️ ESCUDO LIGADO!`).setDescription(`Anti-raid ativado com sucesso!`)] });
+                return await interaction.reply({ embeds: [new EmbedBuilder().setColor('#00FF00').setTitle(`🛡️ ESCUDO LIGADO!`).setDescription(`Anti-raid ativado com sucesso!`)] });
             }
         }
 
@@ -430,7 +430,7 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.reply({ content: `✅ Seu ticket foi aberto em: ${ticketChannel}`, ephemeral: true });
 
         } catch (error) {
-            await interaction.reply({ content: '❌ Ocorreu um erro ao criar o seu ticket.', ephemeral: true });
+            await interaction.reply({ content: `❌ Ocorreu um erro ao criar o seu ticket.`, ephemeral: true });
         }
     }
 });
