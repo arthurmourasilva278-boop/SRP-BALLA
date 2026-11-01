@@ -146,9 +146,17 @@ client.on('guildMemberRemove', async (member) => {
     } catch (e) {}
 
     if (wasBanned) {
-        channel.send({ embeds: [new EmbedBuilder().setColor('#FF0000'].setTitle(`⛔ MEMBRO BANIDO!`).setDescription(`O usuário **${member.user.tag}** vacilou e foi **BANIDO**! 🔨⚡`)] }).catch(() => {});
+        const banEmbed = new EmbedBuilder()
+            .setColor('#FF0000')
+            .setTitle(`⛔ MEMBRO BANIDO!`)
+            .setDescription(`O usuário **${member.user.tag}** vacilou e foi **BANIDO**! 🔨⚡`);
+        channel.send({ embeds: [banEmbed] }).catch(() => {});
     } else {
-        channel.send({ embeds: [new EmbedBuilder().setColor('#FFA500'].setTitle(`👋 MEMBRO SAIU`).setDescription(`O usuário **${member.user.tag}** meteu o pé do servidor. Valeu pela caminhada! 🤝`)] }).catch(() => {});
+        const leaveEmbed = new EmbedBuilder()
+            .setColor('#FFA500')
+            .setTitle(`👋 MEMBRO SAIU`)
+            .setDescription(`O usuário **${member.user.tag}** meteu o pé do servidor. Valeu pela caminhada! 🤝`);
+        channel.send({ embeds: [leaveEmbed] }).catch(() => {});
     }
 });
 
@@ -277,7 +285,6 @@ client.on('interactionCreate', async (interaction) => {
                 new ButtonBuilder().setCustomId('join_giveaway').setLabel('Participar').setStyle(ButtonStyle.Success).setEmoji('🎉')
             );
 
-            // Responde imediatamente para evitar o erro de "aplicativo não respondeu"
             await interaction.reply({ content: `✅ Sorteio iniciado com sucesso!`, ephemeral: true });
             const giveawayMessage = await interaction.channel.send({ embeds: [giveawayEmbed], components: [giveawayRow] });
 
