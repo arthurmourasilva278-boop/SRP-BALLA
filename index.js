@@ -52,7 +52,7 @@ let antiRaidActive = true;
 const recentJoins = new Map();
 const channelCreations = new Map();
 const activePoints = new Map();
-const giveawayParticipants = new Map(); // Armazenar participantes dos sorteios
+const giveawayParticipants = new Map();
 
 const ANTI_RAID_LIMIT = 5;       
 const ANTI_RAID_TIME = 10000;    
@@ -63,42 +63,24 @@ const CHANNEL_CREATION_TIME = 5000;
 
 // --- ⚡ DEFINIÇÃO DOS COMANDOS SLASH ---
 const commands = [
-    new SlashCommandBuilder()
-        .setName('alianca')
-        .setDescription('Envia a ficha de parceria/aliança.'),
-    new SlashCommandBuilder()
-        .setName('xfac')
-        .setDescription('Envia a ficha de desafio Xfac.'),
-    new SlashCommandBuilder()
-        .setName('transferencia')
-        .setDescription('Envia a ficha de transferência para a BALLA.'),
-    new SlashCommandBuilder()
-        .setName('rec')
-        .setDescription('Envia a ficha de recrutamento oficial da BALLA.'),
+    new SlashCommandBuilder().setName('alianca').setDescription('Envia a ficha de parceria/aliança.'),
+    new SlashCommandBuilder().setName('xfac').setDescription('Envia a ficha de desafio Xfac.'),
+    new SlashCommandBuilder().setName('transferencia').setDescription('Envia a ficha de transferência para a BALLA.'),
+    new SlashCommandBuilder().setName('rec').setDescription('Envia a ficha de recrutamento oficial da BALLA.'),
     new SlashCommandBuilder()
         .setName('sorteio')
         .setDescription('Inicia um sorteio na quebrada.')
-        .addStringOption(option => 
-            option.setName('premio')
-                .setDescription('O que vai ser sorteado?')
-                .setRequired(true))
-        .addIntegerOption(option => 
-            option.setName('tempo')
-                .setDescription('Duração do sorteio em minutos')
-                .setRequired(true))
+        .addStringOption(option => option.setName('premio').setDescription('O que vai ser sorteado?').setRequired(true))
+        .addIntegerOption(option => option.setName('tempo').setDescription('Duração do sorteio em minutos').setRequired(true))
 ].map(command => command.toJSON());
 
-// Evento quando o bot está pronto
 client.once('clientReady', async () => {
     console.log(`Bot ${BOT_NAME} ligado com segurança avançada como ${client.user.tag}!`);
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {
         console.log('A registrar comandos Slash (/)...');
-        await rest.put(
-            Routes.applicationCommands(client.user.id),
-            { body: commands },
-        );
+        await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
         console.log('Comandos Slash registados com sucesso!');
     } catch (error) {
         console.error('Erro ao registrar comandos Slash:', error);
@@ -115,59 +97,24 @@ client.on('guildMemberAdd', async (member) => {
         if (accountAge < MIN_ACCOUNT_AGE) {
             try {
                 await member.kick("Anti-Raid Avançado: Conta muito nova (suspeita de bot/raid).");
-                
                 const logChannel = guild.systemChannel || guild.channels.cache.get(WELCOME_CHANNEL_ID);
                 if (logChannel) {
                     const griaEmbed = new EmbedBuilder()
                         .setColor('#FF0000')
                         .setTitle(`🚨 TRETAS DETECTADAS NO CORRE! 🚨`)
-                        .setDescription(`Anti-raid ativado. Quem tentar botar o louco não vai conseguir, vai ser kickado na hora e vai tomar o ban em dobrou na quebrada!\n\n> **Maluco barrado:** ${member.user.tag} (Conta cria nova demais, mandado pra fora na marra!).`)
+                        .setDescription(`Anti-raid ativado. Quem tentar botar o louco não vai conseguir, vai ser kickado na hora e vai tomar o ban em dobro na quebrada!\n\n> **Maluco barrado:** ${member.user.tag}`)
                         .setTimestamp();
                     logChannel.send({ embeds: [griaEmbed] });
                 }
                 return; 
             } catch (e) {
-                console.error("Erro ao expulsar conta nova no anti-raid:", e);
+                console.error("Erro ao expulsar conta nova:", e);
             }
-        }
-
-        if (!recentJoins.has(guild.id)) {
-            recentJoins.set(guild.id, []);
-        }
-        const timestamps = recentJoins.get(guild.id);
-        timestamps.push(now);
-
-        const windowStart = now - ANTI_RAID_TIME;
-        const recent = timestamps.filter(time => time > windowStart);
-        recentJoins.set(guild.id, recent);
-
-        if (recent.length >= ANTI_RAID_LIMIT) {
-            const alertChannel = guild.systemChannel || guild.channels.cache.get(WELCOME_CHANNEL_ID);
-            if (alertChannel) {
-                const raidEmbed = new EmbedBuilder()
-                    .setColor('#FF0000')
-                    .setTitle(`🚨 VISÃO! OS INVASORES TENTARAM BROTAR! 🚨`)
-                    .setDescription(`Anti-raid ativado. Quem tentar fazer gracinha não vai conseguir, vai ser kickado na hora e vai tomar!\n\nFluxo anormal de **${recent.length} cabaços** em segundos. O servidor fechou a banca e ativou o modo blindado!`)
-                    .setTimestamp();
-                
-                alertChannel.send({ embeds: [raidEmbed] });
-            }
-
-            try {
-                await guild.setVerificationLevel(4);
-            } catch (e) {
-                console.error("Não foi possível alterar o nível de verificação automaticamente:", e);
-            }
-            return;
         }
     }
 
     if (member.premiumSince) {
-        try {
-            await member.roles.add(ROLE_BOOSTER_ID);
-        } catch (e) {
-            console.error("Erro ao atribuir cargo de booster:", e);
-        }
+        await member.roles.add(ROLE_BOOSTER_ID).catch(() => {});
     }
 
     const welcomeChannel = guild.channels.cache.get(WELCOME_CHANNEL_ID);
@@ -175,158 +122,63 @@ client.on('guildMemberAdd', async (member) => {
         const welcomeEmbed = new EmbedBuilder()
             .setColor('#800080')
             .setTitle(`🟣 SEJA BEM-VINDO(A) À ${BOT_NAME}!`)
-            .setDescription(
-                `E aí ${member}! Salve, salve! É uma honra ter você com a gente.\n\n` +
-                `Antes de colar no corre e começar o seu RP, fique atento:\n\n` +
-                `📜 **1. Fique por dentro:** Leia nossas regras no canal oficial.\n` +
-                `🎫 **2. Atendimento:** Abra um ticket caso precise de suporte, transferências ou pagar metas.\n` +
-                `🚀 **3. Impulsione:** Deixe seu **Boost** no servidor e ganhe seu cargo VIP automaticamente!\n\n` +
-                `Aproveite a estadia, mantenha o foco no personagem e bom jogo! 🤝🔥`
-            )
+            .setDescription(`E aí ${member}! Salve, salve! É uma honra ter você com a gente. Aproveite a estadia e bom jogo! 🤝🔥`)
             .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-            .setFooter({ 
-                text: `Membro nº ${guild.memberCount} • ${BOT_NAME}`, 
-                iconURL: guild.iconURL({ dynamic: true }) 
-            })
             .setTimestamp();
-
         welcomeChannel.send({ content: `👋 Salve ${member}!`, embeds: [welcomeEmbed] });
     }
 });
 
-// --- 🚪 EVENTO DE SAÍDA / BANIMENTO DE MEMBRO ---
+// --- 🚪 EVENTO DE SAÍDA / BANIMENTO ---
 client.on('guildMemberRemove', async (member) => {
     const guild = member.guild;
     const channel = guild.channels.cache.get(WELCOME_CHANNEL_ID) || guild.systemChannel;
     if (!channel) return;
 
     await new Promise(resolve => setTimeout(resolve, 1500));
-
     let wasBanned = false;
     try {
-        const fetchedLogs = await guild.fetchAuditLogs({
-            limit: 1,
-            type: AuditLogEvent.MemberBanAdd,
-        });
-
+        const fetchedLogs = await guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberBanAdd });
         const banLog = fetchedLogs.entries.first();
         if (banLog && banLog.target.id === member.id && (Date.now() - banLog.createdAt.getTime() < 6000)) {
             wasBanned = true;
         }
-    } catch (e) {
-        console.error("Erro ao buscar logs de banimento:", e);
-    }
+    } catch (e) {}
 
     if (wasBanned) {
         const banEmbed = new EmbedBuilder()
             .setColor('#FF0000')
             .setTitle(`⛔ MEMBRO BANIDO!`)
-            .setDescription(`O usuário **${member.user.tag}** vacilou, quebrou as regras e foi **BANIDO** da nossa comunidade! 🔨⚡`)
-            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-            .setFooter({ text: BOT_NAME })
-            .setTimestamp();
-
-        await channel.send({ embeds: [banEmbed] }).catch(() => {});
+            .setDescription(`O usuário **${member.user.tag}** vacilou e foi **BANIDO**! 🔨⚡`);
+        channel.send({ embeds: [banEmbed] }).catch(() => {});
     } else {
         const leaveEmbed = new EmbedBuilder()
             .setColor('#FFA500')
             .setTitle(`👋 MEMBRO SAIU`)
-            .setDescription(`O usuário **${member.user.tag}** meteu o pé do servidor. Valeu pela caminhada e boa sorte no corre! 🤝`)
-            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-            .setFooter({ text: BOT_NAME })
-            .setTimestamp();
-
-        await channel.send({ embeds: [leaveEmbed] }).catch(() => {});
+            .setDescription(`O usuário **${member.user.tag}** meteu o pé do servidor. Valeu pela caminhada! 🤝`);
+        channel.send({ embeds: [leaveEmbed] }).catch(() => {});
     }
 });
 
-// 🛡️ ANTI-RAID: CRIAÇÃO DE CANAIS EM MASSA
-client.on('guildChannelCreate', async (channel) => {
-    if (!antiRaidActive) return;
-    const guild = channel.guild;
-
-    try {
-        const fetchedLogs = await guild.fetchAuditLogs({
-            limit: 1,
-            type: AuditLogEvent.ChannelCreate,
-        });
-
-        const channelLog = fetchedLogs.entries.first();
-        if (!channelLog) return;
-
-        const { executor } = channelLog;
-        if (!executor || executor.bot || executor.id === OWNER_ID) return;
-
-        const now = Date.now();
-        if (!channelCreations.has(executor.id)) {
-            channelCreations.set(executor.id, []);
-        }
-
-        const userTimestamps = channelCreations.get(executor.id);
-        userTimestamps.push(now);
-
-        const windowStart = now - CHANNEL_CREATION_TIME;
-        const recentCreations = userTimestamps.filter(time => time > windowStart);
-        channelCreations.set(executor.id, recentCreations);
-
-        if (recentCreations.length >= CHANNEL_CREATION_LIMIT) {
-            const memberToBan = await guild.members.fetch(executor.id).catch(() => null);
-            if (memberToBan) {
-                await memberToBan.ban({ reason: "Anti-Raid: Tentativa de criação em massa de canais." });
-
-                const alertChannel = guild.systemChannel || guild.channels.cache.get(WELCOME_CHANNEL_ID);
-                if (alertChannel) {
-                    const banEmbed = new EmbedBuilder()
-                        .setColor('#FF0000')
-                        .setTitle(`🚨 TENTARAM BUGAR A BASE E DANÇARAM! 🚨`)
-                        .setDescription(`Anti-raid ativado. Quem tentar fazer graça não vai conseguir, vai ser kickado na hora e vai tomar!\n\nO comédia do **${executor.tag}** achou que ia lotar de canal e tomou **BAN PERMANENTE** na hora! ⚡`);
-                    
-                    alertChannel.send({ embeds: [banEmbed] });
-                }
-            }
-        }
-    } catch (e) {
-        console.error("Erro no sistema anti-raid de canais:", e);
-    }
-});
-
-client.on('guildMemberUpdate', async (oldMember, newMember) => {
-    if (!oldMember.premiumSince && newMember.premiumSince) {
-        try {
-            await newMember.roles.add(ROLE_BOOSTER_ID);
-        } catch (e) {
-            console.error("Erro ao atribuir cargo de booster:", e);
-        }
-    }
-});
-
-// --- COMANDOS TRADICIONAIS E CANAL ARMADILHA ---
+// --- COMANDOS TRADICIONAIS E CANAL ARMADILHA (COM PRIORIDADE ABSOLUTA) ---
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
-    // 1. Processar Comandos com Prefixos primeiro
+    // 1. Processar Comandos com o prefixo '+' primeiro em qualquer canal
     if (message.content.startsWith('+antiraid')) {
         if (message.author.id !== OWNER_ID) {
             return message.reply("❌ **Acesso negado!** Só o chefe pode mexer na segurança da quebrada.");
         }
-
         const args = message.content.split(' ');
         const option = args[1]?.toLowerCase();
-
         if (option === 'off' || option === 'desativar') {
             antiRaidActive = false;
-            return message.reply("⚠️ **Anti-Raid desligado!** A firma tá vulnerável, cuidado.");
+            return message.reply("⚠️ **Anti-Raid desligado!**");
         } else if (option === 'on' || option === 'ativar') {
             antiRaidActive = true;
-            
-            const ligadoEmbed = new EmbedBuilder()
-                .setColor('#00FF00')
-                .setTitle(`🛡️ ESCUDO LIGADO! A FIRMA TÁ BLINDADA! 🛡️`)
-                .setDescription(`Anti-raid ativado. Quem tentar fazer gracinha não vai conseguir, vai ser kickado na hora e vai tomar!`);
-            
-            return message.reply({ embeds: [ligadoEmbed] });
+            return message.reply({ embeds: [new EmbedBuilder().setColor('#00FF00').setTitle(`🛡️ ESCUDO LIGADO!`).setDescription(`Anti-raid ativado. Quem tentar fazer gracinha vai tomar!`)] });
         } else {
-            return message.reply(`Situação do Anti-Raid: **${antiRaidActive ? 'ATIVADO ✅' : 'DESATIVADO ❌'}**\nManda \`+antiraid on\` para blindar ou \`+antiraid off\` para desativar.`);
+            return message.reply(`Situação do Anti-Raid: **${antiRaidActive ? 'ATIVADO ✅' : 'DESATIVADO ❌'}**`);
         }
     }
 
@@ -334,13 +186,11 @@ client.on('messageCreate', async (message) => {
         const embed = new EmbedBuilder()
             .setColor('#800080')
             .setTitle(`⏱️ Sistema de Bate-Ponto — ${BOT_NAME}`)
-            .setDescription('Clique no botão abaixo para iniciar ou encerrar o seu ponto de serviço.');
-
+            .setDescription('Clique no botão abaixo para iniciar ou encerrar o seu ponto.');
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId('ponto_iniciar').setLabel('Iniciar Ponto').setStyle(ButtonStyle.Success).setEmoji('🟢'),
             new ButtonBuilder().setCustomId('ponto_encerrar').setLabel('Encerrar Ponto').setStyle(ButtonStyle.Danger).setEmoji('🔴')
         );
-
         await message.channel.send({ embeds: [embed], components: [row] });
         await message.delete().catch(() => {});
         return;
@@ -350,47 +200,32 @@ client.on('messageCreate', async (message) => {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply("Apenas administradores podem usar este comando.");
         }
-
         const embed = new EmbedBuilder()
             .setColor('#800080')
             .setTitle(`🎟️ Central de Atendimento — ${BOT_NAME}`)
-            .setDescription(
-                'Central de atendimento\n\n' +
-                '• Um canal privado será criado apenas para você\n\n' +
-                '• Apenas você e nossa equipe de suporte terá acesso\n\n' +
-                '• Nossa equipe responderá o mais rápido possível\n\n' +
-                'IMPORTANTE\n' +
-                '• Use o sistema de ticket apenas para questões que precisam de suporte'
-            )
-            .setFooter({ text: `Desenvolvido por krozz • ${BOT_NAME}` });
-
+            .setDescription('Central de atendimento\n\n• Um canal privado será criado para você');
         const optionsMenu = new StringSelectMenuBuilder()
             .setCustomId('menu_opcoes')
             .setPlaceholder('Opções')
             .addOptions([
-                { label: 'Falar com gestão', description: 'Tratar assuntos diretamente com a gestão', value: 'ticket_gestao', emoji: '🗣️' },
-                { label: 'Dúvidas', description: 'Tirar dúvidas gerais sobre a facção/servidor', value: 'ticket_duvidas', emoji: '❓' },
-                { label: 'Outros', description: 'Outros assuntos não especificados', value: 'ticket_outros', emoji: '📌' },
-                { label: 'Alianças', description: 'Tratar sobre parcerias', value: 'ticket_aliancas', emoji: '🛡️' },
-                { label: 'Denúncias', description: 'Reportar infrações', value: 'ticket_denuncias', emoji: '🚨' },
-                { label: 'Booster', description: 'Benefícios de impulsionador', value: 'ticket_booster', emoji: '🚀' }
+                { label: 'Falar com gestão', value: 'ticket_gestao', emoji: '🗣️' },
+                { label: 'Dúvidas', value: 'ticket_duvidas', emoji: '❓' },
+                { label: 'Outros', value: 'ticket_outros', emoji: '📌' },
+                { label: 'Alianças', value: 'ticket_aliancas', emoji: '🛡️' },
+                { label: 'Denúncias', value: 'ticket_denuncias', emoji: '🚨' },
+                { label: 'Booster', value: 'ticket_booster', emoji: '🚀' }
             ]);
-
         const factionMenu = new StringSelectMenuBuilder()
             .setCustomId('menu_faccao')
             .setPlaceholder('Facção')
             .addOptions([
-                { label: 'Xfac', description: 'Negociações e acordos entre facções', value: 'ticket_xfac', emoji: '🤝' },
-                { label: 'Transferência', description: 'Mudança de fac ou setor', value: 'ticket_transferencia', emoji: '🔄' },
-                { label: 'Pagar Metas', description: 'Envio de provas de metas', value: 'ticket_pagarmetas', emoji: '💰' },
-                { label: 'Solicitar cargo', description: 'Pedir ou ajustar seus cargos/setor', value: 'ticket_solicitar_cargo', emoji: '🏷️' },
-                { label: 'Recrutamento', description: 'Informações para entrada na fac', value: 'ticket_recrutamento', emoji: '📥' }
+                { label: 'Xfac', value: 'ticket_xfac', emoji: '🤝' },
+                { label: 'Transferência', value: 'ticket_transferencia', emoji: '🔄' },
+                { label: 'Pagar Metas', value: 'ticket_pagarmetas', emoji: '💰' },
+                { label: 'Solicitar cargo', value: 'ticket_solicitar_cargo', emoji: '🏷️' },
+                { label: 'Recrutamento', value: 'ticket_recrutamento', emoji: '📥' }
             ]);
-
-        const row1 = new ActionRowBuilder().addComponents(optionsMenu);
-        const row2 = new ActionRowBuilder().addComponents(factionMenu);
-
-        await message.channel.send({ embeds: [embed], components: [row1, row2] });
+        await message.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(optionsMenu), new ActionRowBuilder().addComponents(factionMenu)] });
         await message.delete().catch(() => {});
         return;
     }
@@ -399,130 +234,39 @@ client.on('messageCreate', async (message) => {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply("Apenas administradores podem usar este comando.");
         }
-
-        const regrasEmbed = new EmbedBuilder()
-            .setColor('#800080')
-            .setTitle(`————————• REGRAS ——————————`)
-            .setDescription(
-                '• Proibido racismo\n' +
-                '• Proibido Gordofobia\n' +
-                '• Proibido Xenofobia\n' +
-                '• Sem nenhum tipo de preconceito\n' +
-                '• Respeitar a hierarquia\n' +
-                '• Respeitar os canais\n' +
-                '• Não sair do personagem\n' +
-                '• Siga as regras do RP'
-            );
-
-        const punicoesEmbed = new EmbedBuilder()
-            .setColor('#FF0000')
-            .setTitle(`————————• Punições ——————————`)
-            .setDescription(
-                '• **Preconceitos:** 1 a 7 dias *(racismo é perm)*\n' +
-                '• **Xingar sem motivo:** adv (1/3)\n' +
-                '• **Não respeitar a hierarquia:** adv (1/3)\n' +
-                '• **Não seguir as regras do RP:** Castigo (1/3), 1h pronto.'
-            );
-
+        const regrasEmbed = new EmbedBuilder().setColor('#800080').setTitle(`————————• REGRAS ——————————`).setDescription('• Proibido racismo\n• Respeitar a hierarquia\n• Siga as regras do RP');
+        const punicoesEmbed = new EmbedBuilder().setColor('#FF0000').setTitle(`————————• Punições ——————————`).setDescription('• Preconceitos: 1 a 7 dias');
         await message.channel.send({ embeds: [regrasEmbed, punicoesEmbed] });
         await message.delete().catch(() => {});
         return;
     }
 
-    // 2. Sistema de Canal Armadilha (HoneyPot) com exceção para os IDs imunes
+    // 2. Canal Armadilha (HoneyPot)
     if (message.channel.id === TRAP_CHANNEL_ID) {
         if (!IMMUNE_USERS.includes(message.author.id)) {
             try {
                 await message.delete().catch(() => {});
                 if (message.member && message.member.kickable) {
-                    await message.member.kick("Digitou no canal armadilha (HoneyPot).");
-                    
+                    await message.member.kick("Digitou no canal armadilha.");
                     const logChannel = message.guild.channels.cache.get(WELCOME_CHANNEL_ID) || message.guild.systemChannel;
-                    if (logChannel) {
-                        logChannel.send(`🪤 **[ARMADILHA]** O usuário **${message.author.tag}** caiu na armadilha ao digitar no canal proibido e foi **EXPULSO**!`);
-                    }
+                    if (logChannel) logChannel.send(`🪤 O usuário **${message.author.tag}** caiu na armadilha e foi **EXPULSO**!`);
                 }
-            } catch (err) {
-                console.error("Erro ao aplicar o kick da armadilha:", err);
-            }
+            } catch (err) {}
             return;
         }
     }
 });
 
-// --- 🎯 TRATAMENTO DOS COMANDOS SLASH E INTERAÇÕES ---
+// --- 🎯 TRATAMENTO DE INTERAÇÕES (SLASH E BOTÕES) ---
 client.on('interactionCreate', async (interaction) => {
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
 
-        if (commandName === 'alianca') {
-            const aliancaMsg = 
-                `PARCERIA 🤝\n\n` +
-                `NOME FAC:\n\n` +
-                `QUANTOS MEMBROS:\n\n` +
-                `FAC OFICIAL: \n\n` +
-                `LIDER:`;
-            return await interaction.reply({ content: aliancaMsg });
-        }
+        if (commandName === 'alianca') return await interaction.reply({ content: `PARCERIA 🤝\n\nNOME FAC:\nQUANTOS MEMBROS:\nFAC OFICIAL:\nLIDER:` });
+        if (commandName === 'xfac') return await interaction.reply({ content: `# xfac\n> Fac:\n> Valor:\n> Horário:\n> Quantos v quantos:\n> Regras:\n> Local:\n> Melhor de quantos:` });
+        if (commandName === 'transferencia') return await interaction.reply({ content: `TRANSFERÊNCIA PARA A BALLA\n\n**Seu Nick:\nSua facção:\nCargo desejado:\nProvas/ print:**` });
+        if (commandName === 'rec') return await interaction.reply({ content: `**RECRUTAMENTO | BALLA**\n👤 Nome:\n🎂 Idade real:\n🎮 Nick Roblox:` });
 
-        if (commandName === 'xfac') {
-            const xfacMsg = 
-                `# xfac\n\n` +
-                `> Fac:\n\n` +
-                `> Valor:\n\n` +
-                `> Horário:\n\n` +
-                `> Quantos v quantos:\n\n` +
-                `> Regras:\n\n` +
-                `> Local: \n\n` +
-                `> Melhor de quantos:`;
-            return await interaction.reply({ content: xfacMsg });
-        }
-
-        if (commandName === 'transferencia') {
-            const transMsg = 
-                `TRANSFERÊNCIA PARA A BALLA\n\n` +
-                `**Olá, estarei realizando sua \n` +
-                `transferência!\n\n` +
-                `> Seu Nick:\n\n` +
-                `> Sua facção:\n\n` +
-                `> Cargo desejado:\n\n` +
-                `> Provas/ print :**`;
-            return await interaction.reply({ content: transMsg });
-        }
-
-        if (commandName === 'rec') {
-            const recMsg = 
-                `**RECRUTAMENTO | BALLA**\n\n` +
-                `📋 **IDENTIFICAÇÃO**\n\n` +
-                `👤 Nome:\n> \n\n` +
-                `🎂 Idade real:\n> \n\n` +
-                `🎮 Nick Roblox:\n> \n\n` +
-                `💬 Nick Discord:\n> \n\n` +
-                `⏰ Horário disponível:\n> \n\n` +
-                `🧁 Já participou de outra facção? Qual?\n> \n\n` +
-                `━━━━━━━━━━━━━━\n\n` +
-                `📜 **RP**\n\n` +
-                `🔫 RDM:\n> \n\n` +
-                `🕵️ CL:\n> \n\n` +
-                `🚗 VDM:\n> \n\n` +
-                `🌙 Dark RP:\n> \n\n` +
-                `🚫 Anti-RP:\n> \n\n` +
-                `━━━━━━━━━━━━━━\n\n` +
-                `👤 **PERFIL**\n\n` +
-                `🤿 O que é maturidade?\n> \n\n` +
-                `📊 Nota de maturidade (0-10):\n> \n\n` +
-                ` Por que entrar no Gangue do ovo roxo ?\n> \n\n` +
-                `💪 Melhor qualidade:\n> \n\n` +
-                `⚠️ Maior defeito:\n> \n\n` +
-                `🚔 Como reagiria a uma abordagem policial no RP?\n> \n\n` +
-                `━━━━━━━━━━━━━━\n\n` +
-                `🎧 **EXTRAS**\n\n` +
-                `🎙️ Possui microfone?\n> \n\n` +
-                `🎮 Joga em equipe ou sozinho?\n> `;
-            return await interaction.reply({ content: recMsg });
-        }
-
-        // --- SISTEMA DE SORTEIO (/sorteio) ---
         if (commandName === 'sorteio') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
                 return await interaction.reply({ content: "❌ Apenas administradores podem iniciar sorteios!", ephemeral: true });
@@ -536,62 +280,33 @@ client.on('interactionCreate', async (interaction) => {
             const giveawayEmbed = new EmbedBuilder()
                 .setColor('#800080')
                 .setTitle(`🎉 SORTEIO — ${BOT_NAME} 🎉`)
-                .setDescription(
-                    `🎁 **Prêmio:** **${premio}**\n\n` +
-                    `👑 **Criado por:** ${interaction.user}\n` +
-                    `⏰ **Termina em:** <t:${terminoTimestamp}:R> (<t:${terminoTimestamp}:f>)\n\n` +
-                    `👇 Clica no botão abaixo para participar do corre!`
-                )
-                .setFooter({ text: `Participe e boa sorte!` })
-                .setTimestamp();
+                .setDescription(`🎁 **Prêmio:** **${premio}**\n\n👑 **Criado por:** ${interaction.user}\n⏰ **Termina em:** <t:${terminoTimestamp}:R>\n\n👇 Clica no botão abaixo para participar!`);
 
             const giveawayRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('join_giveaway')
-                    .setLabel('Participar')
-                    .setStyle(ButtonStyle.Success)
-                    .setEmoji('🎉')
+                new ButtonBuilder().setCustomId('join_giveaway').setLabel('Participar').setStyle(ButtonStyle.Success).setEmoji('🎉')
             );
 
             await interaction.reply({ content: `✅ Sorteio iniciado com sucesso!`, ephemeral: true });
             const giveawayMessage = await interaction.channel.send({ embeds: [giveawayEmbed], components: [giveawayRow] });
 
-            // Inicializar lista de participantes para esta mensagem
             giveawayParticipants.set(giveawayMessage.id, new Set());
 
-            // Temporizador para encerrar o sorteio
             setTimeout(async () => {
                 const participantsSet = giveawayParticipants.get(giveawayMessage.id);
                 const participantsArray = Array.from(participantsSet || []);
 
                 if (participantsArray.length === 0) {
-                    const endedEmbed = new EmbedBuilder()
-                        .setColor('#FF0000')
-                        .setTitle(`🎉 SORTEIO ENCERRADO — ${BOT_NAME} 🎉`)
-                        .setDescription(`🎁 **Prêmio:** **${premio}**\n\n❌ **Nenhum maluco participou a tempo, sorteio cancelado!**`);
-                    
+                    const endedEmbed = new EmbedBuilder().setColor('#FF0000').setTitle(`🎉 SORTEIO ENCERRADO`).setDescription(`Nenhum participante.`);
                     await giveawayMessage.edit({ embeds: [endedEmbed], components: [] }).catch(() => {});
                     giveawayParticipants.delete(giveawayMessage.id);
                     return;
                 }
 
-                // Escolher vencedor aleatório
                 const winnerId = participantsArray[Math.floor(Math.random() * participantsArray.length)];
-                const winnerUser = await interaction.guild.members.fetch(winnerId).catch(() => null);
-
-                const winnerEmbed = new EmbedBuilder()
-                    .setColor('#00FF00')
-                    .setTitle(`🎉 SORTEIO ENCERRADO! 🎉`)
-                    .setDescription(
-                        `🎁 **Prêmio:** **${premio}**\n\n` +
-                        `🏆 **Vencedor:** ${winnerUser ? winnerUser : `<@${winnerId}>`}!\n\n` +
-                        `Parabéns, mandou bem no corre e faturou o prêmio! 🚀🔥`
-                    )
-                    .setTimestamp();
+                const winnerEmbed = new EmbedBuilder().setColor('#00FF00').setTitle(`🎉 VENCEDOR DO SORTEIO!`).setDescription(`🏆 Vencedor: <@${winnerId}>\nPrêmio: **${premio}**`);
 
                 await giveawayMessage.edit({ embeds: [winnerEmbed], components: [] }).catch(() => {});
-                await giveawayMessage.reply(`🎉 Parabéns ${winnerUser ? winnerUser : `<@${winnerId}>`}! Você ganhou o prêmio **${premio}**! Chama no corre para resgatar! 🏆🔥`);
-                
+                await giveawayMessage.reply(`🎉 Parabéns <@${winnerId}>! Você ganhou **${premio}**! 🚀🔥`);
                 giveawayParticipants.delete(giveawayMessage.id);
             }, tempoMs);
         }
@@ -599,117 +314,32 @@ client.on('interactionCreate', async (interaction) => {
 
     if (interaction.isButton()) {
         const userId = interaction.user.id;
-        const now = Date.now();
-        const options = { timeZone: 'America/Sao_Paulo', dateStyle: 'long', timeStyle: 'short' };
-        const dataFormatada = new Intl.DateTimeFormat('pt-BR', options).format(now);
-
-        // --- PARTICIPAR DO SORTEIO ---
         if (interaction.customId === 'join_giveaway') {
             const messageId = interaction.message.id;
-            if (!giveawayParticipants.has(messageId)) {
-                return await interaction.reply({ content: `❌ Este sorteio já terminou ou expirou!`, ephemeral: true });
-            }
-
+            if (!giveawayParticipants.has(messageId)) return await interaction.reply({ content: `❌ Sorteio encerrado!`, ephemeral: true });
             const participantsSet = giveawayParticipants.get(messageId);
-            if (participantsSet.has(userId)) {
-                return await interaction.reply({ content: `⚠️ Você já está a participar deste sorteio! Fica tranquilo e aguarda o resultado.`, ephemeral: true });
-            }
-
+            if (participantsSet.has(userId)) return await interaction.reply({ content: `⚠️ Já estás a participar!`, ephemeral: true });
             participantsSet.add(userId);
-            return await interaction.reply({ content: `✅ Participação garantida com sucesso! Boa sorte no sorteio! 🍀`, ephemeral: true });
+            return await interaction.reply({ content: `✅ Participação garantida! 🍀`, ephemeral: true });
         }
 
         if (interaction.customId === 'ponto_iniciar') {
-            activePoints.set(userId, { startTime: now, startStr: dataFormatada });
-            return await interaction.reply({ content: `🟢 Ponto iniciado com sucesso às **${dataFormatada}**!`, ephemeral: true });
+            activePoints.set(userId, { startTime: Date.now(), startStr: new Date().toLocaleTimeString() });
+            return await interaction.reply({ content: `🟢 Ponto iniciado!`, ephemeral: true });
         }
 
         if (interaction.customId === 'ponto_encerrar') {
-            const pontoData = activePoints.get(userId);
-            if (!pontoData) {
-                return await interaction.reply({ content: `❌ Você não iniciou nenhum ponto ainda! Clique em "Iniciar Ponto" primeiro.`, ephemeral: true });
-            }
-
-            const diffMs = now - pontoData.startTime;
-            const diffSec = Math.floor(diffMs / 1000);
-            const minutes = Math.floor(diffSec / 60);
-            const hours = Math.floor(minutes / 60);
-            const displayMin = minutes % 60;
-            const displaySec = diffSec % 60;
-
-            let tempoTotalStr = '';
-            if (hours > 0) tempoTotalStr += `${hours} hora(s) `;
-            if (displayMin > 0 || hours > 0) tempoTotalStr += `${displayMin} minuto(s) `;
-            tempoTotalStr += `${displaySec} segundo(s)`;
-
-            const pontoEmbed = new EmbedBuilder()
-                .setColor('#800080')
-                .setTitle(`⏱️ Registo de Ponto — ${BOT_NAME}`)
-                .addFields(
-                    { name: 'Usuário:', value: `${interaction.user}`, inline: false },
-                    { name: 'Início:', value: `${pontoData.startStr}`, inline: false },
-                    { name: 'Termino:', value: `${dataFormatada}`, inline: false },
-                    { name: 'Tempo total:', value: `${tempoTotalStr}`, inline: false }
-                )
-                .setFooter({ text: `Sistema desenvolvido pela krozz • ${BOT_NAME}` })
-                .setTimestamp();
-
+            const data = activePoints.get(userId);
+            if (!data) return await interaction.reply({ content: `❌ Não tens ponto iniciado!`, ephemeral: true });
             activePoints.delete(userId);
-            return await interaction.reply({ embeds: [pontoEmbed] });
+            return await interaction.reply({ content: `🔴 Ponto encerrado com sucesso!`, ephemeral: true });
         }
 
         if (interaction.customId === 'close_ticket') {
-            const channel = interaction.channel;
-            await interaction.reply({ content: '🔒 Fechando ticket em 5 segundos...' });
-            setTimeout(() => {
-                channel.delete().catch(() => {});
-            }, 5000);
-        }
-    }
-
-    if (interaction.isStringSelectMenu()) {
-        const ticketType = interaction.values[0].replace('ticket_', '');
-        const guild = interaction.guild;
-        const member = interaction.user;
-
-        try {
-            const ticketChannel = await guild.channels.create({
-                name: `${ticketType}-${member.username}`,
-                type: ChannelType.GuildText,
-                permissionOverwrites: [
-                    {
-                        id: guild.id,
-                        deny: [PermissionsBitField.Flags.ViewChannel],
-                    },
-                    {
-                        id: member.id,
-                        allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory],
-                    },
-                    {
-                        id: client.user.id,
-                        allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels],
-                    }
-                ],
-            });
-
-            const closeRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('close_ticket').setLabel('Fechar Ticket').setStyle(ButtonStyle.Danger).setEmoji('🔒')
-            );
-
-            const openedEmbed = new EmbedBuilder()
-                .setColor('#800080')
-                .setTitle(`Ticket: ${ticketType.toUpperCase().replace('_', ' ')}`)
-                .setDescription(`Olá ${member}, seu ticket foi aberto com sucesso!\nExplique o motivo do seu contato e aguarde a equipe responsável (${BOT_NAME}).`);
-
-            await ticketChannel.send({ content: `${member}`, embeds: [openedEmbed], components: [closeRow] });
-            await interaction.reply({ content: `✅ Seu ticket foi aberto em: ${ticketChannel}`, ephemeral: true });
-
-        } catch (error) {
-            console.error(error);
-            await interaction.reply({ content: '❌ Ocorreu um erro ao criar o seu ticket.', ephemeral: true });
+            await interaction.reply({ content: '🔒 Fechando ticket...' });
+            setTimeout(() => interaction.channel.delete().catch(() => {}), 3000);
         }
     }
 });
 
-// Login do bot
 client.login(process.env.DISCORD_TOKEN);
