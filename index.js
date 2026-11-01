@@ -1,4 +1,3 @@
- 
 const { 
     Client, 
     GatewayIntentBits, 
@@ -44,9 +43,9 @@ const ROLE_BOOSTER_ID = "1565957334507987054";
 const WELCOME_CHANNEL_ID = "1565919892291584030";
 const OWNER_ID = "1230674913564823562"; 
 
-// Configuração da Armadilha
+// --- Configuração da Armadilha e Exceções ---
 const TRAP_CHANNEL_ID = "1565934311985782974";
-const IMMUNE_USER_ID = "1166477445008998433";
+const IMMUNE_USERS = ["1230674913564823562", "1166477445008998433"];
 
 // --- 🛡️ SISTEMA ANTI-RAID AVANÇADO ---
 let antiRaidActive = true; 
@@ -57,24 +56,37 @@ const activePoints = new Map();
 const ANTI_RAID_LIMIT = 5;       
 const ANTI_RAID_TIME = 10000;    
 const MIN_ACCOUNT_AGE = 7 * 24 * 60 * 60 * 1000; 
+
 const CHANNEL_CREATION_LIMIT = 3; 
 const CHANNEL_CREATION_TIME = 5000; 
 
 // --- ⚡ DEFINIÇÃO DOS COMANDOS SLASH ---
 const commands = [
-    new SlashCommandBuilder().setName('alianca').setDescription('Envia a ficha de parceria/aliança.'),
-    new SlashCommandBuilder().setName('xfac').setDescription('Envia a ficha de desafio Xfac.'),
-    new SlashCommandBuilder().setName('transferencia').setDescription('Envia a ficha de transferência para a BALLA.'),
-    new SlashCommandBuilder().setName('rec').setDescription('Envia a ficha de recrutamento oficial da BALLA.')
+    new SlashCommandBuilder()
+        .setName('alianca')
+        .setDescription('Envia a ficha de parceria/aliança.'),
+    new SlashCommandBuilder()
+        .setName('xfac')
+        .setDescription('Envia a ficha de desafio Xfac.'),
+    new SlashCommandBuilder()
+        .setName('transferencia')
+        .setDescription('Envia a ficha de transferência para a BALLA.'),
+    new SlashCommandBuilder()
+        .setName('rec')
+        .setDescription('Envia a ficha de recrutamento oficial da BALLA.')
 ].map(command => command.toJSON());
 
+// Evento quando o bot está pronto
 client.once('clientReady', async () => {
-    console.log(`Bot ${BOT_NAME} ligado com sucesso como ${client.user.tag}!`);
+    console.log(`Bot ${BOT_NAME} ligado com segurança avançada como ${client.user.tag}!`);
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {
         console.log('A registrar comandos Slash (/)...');
-        await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
+        await rest.put(
+            Routes.applicationCommands(client.user.id),
+            { body: commands },
+        );
         console.log('Comandos Slash registados com sucesso!');
     } catch (error) {
         console.error('Erro ao registrar comandos Slash:', error);
@@ -90,20 +102,60 @@ client.on('guildMemberAdd', async (member) => {
         const accountAge = now - member.user.createdTimestamp;
         if (accountAge < MIN_ACCOUNT_AGE) {
             try {
-                await member.kick("Anti-Raid: Conta muito nova.");
-                const logChannel = guild.channels.cache.get(WELCOME_CHANNEL_ID) || guild.systemChannel;
+                await member.kick("Anti-Raid Avançado: Conta muito nova (suspeita de bot/raid).");
+                
+                const logChannel = guild.systemChannel || guild.channels.cache.get(WELCOME_CHANNEL_ID);
                 if (logChannel) {
-                    logChannel.send({ embeds: [new EmbedBuilder().setColor('#FF0000').setTitle(`🚨 TRETAS DETECTADAS!`).setDescription(`Anti-raid ativado. Quem tentar não vai conseguir, vai ser kickado na hora e vai tomar.\n\n> **Maluco barrado:** ${member.user.tag}`)] });
+                    const griaEmbed = new EmbedBuilder()
+                        .setColor('#FF0000')
+                        .setTitle(`🚨 TRETAS DETECTADAS NO CORRE! 🚨`)
+                        .setDescription(`Anti-raid ativado. Quem tentar botar o louco não vai conseguir, vai ser kickado na hora e vai tomar o ban em dobrou na quebrada!\n\n> **Maluco barrado:** ${member.user.tag} (Conta cria nova demais, mandado pra fora na marra!).`)
+                        .setTimestamp();
+                    logChannel.send({ embeds: [griaEmbed] });
                 }
                 return; 
             } catch (e) {
-                console.error("Erro ao expulsar conta nova:", e);
+                console.error("Erro ao expulsar conta nova no anti-raid:", e);
             }
+        }
+
+        if (!recentJoins.has(guild.id)) {
+            recentJoins.set(guild.id, []);
+        }
+        const timestamps = recentJoins.get(guild.id);
+        timestamps.push(now);
+
+        const windowStart = now - ANTI_RAID_TIME;
+        const recent = timestamps.filter(time => time > windowStart);
+        recentJoins.set(guild.id, recent);
+
+        if (recent.length >= ANTI_RAID_LIMIT) {
+            const alertChannel = guild.systemChannel || guild.channels.cache.get(WELCOME_CHANNEL_ID);
+            if (alertChannel) {
+                const raidEmbed = new EmbedBuilder()
+                    .setColor('#FF0000')
+                    .setTitle(`🚨 VISÃO! OS INVASORES TENTARAM BROTAR! 🚨`)
+                    .setDescription(`Anti-raid ativado. Quem tentar fazer gracinha não vai conseguir, vai ser kickado na hora e vai tomar!\n\nFluxo anormal de **${recent.length} cabaços** em segundos. O servidor fechou a banca e ativou o modo blindado!`)
+                    .setTimestamp();
+                
+                alertChannel.send({ embeds: [raidEmbed] });
+            }
+
+            try {
+                await guild.setVerificationLevel(4);
+            } catch (e) {
+                console.error("Não foi possível alterar o nível de verificação automaticamente:", e);
+            }
+            return;
         }
     }
 
     if (member.premiumSince) {
-        await member.roles.add(ROLE_BOOSTER_ID).catch(() => {});
+        try {
+            await member.roles.add(ROLE_BOOSTER_ID);
+        } catch (e) {
+            console.error("Erro ao atribuir cargo de booster:", e);
+        }
     }
 
     const welcomeChannel = guild.channels.cache.get(WELCOME_CHANNEL_ID);
@@ -111,77 +163,161 @@ client.on('guildMemberAdd', async (member) => {
         const welcomeEmbed = new EmbedBuilder()
             .setColor('#800080')
             .setTitle(`🟣 SEJA BEM-VINDO(A) À ${BOT_NAME}!`)
-            .setDescription(`E aí ${member}! Salve, salve! É uma honra ter você com a gente.\n\nAproveite a estadia e bom jogo! 🤝🔥`)
+            .setDescription(
+                `E aí ${member}! Salve, salve! É uma honra ter você com a gente.\n\n` +
+                `Antes de colar no corre e começar o seu RP, fique atento:\n\n` +
+                `📜 **1. Fique por dentro:** Leia nossas regras no canal oficial.\n` +
+                `🎫 **2. Atendimento:** Abra um ticket caso precise de suporte, transferências ou pagar metas.\n` +
+                `🚀 **3. Impulsione:** Deixe seu **Boost** no servidor e ganhe seu cargo VIP automaticamente!\n\n` +
+                `Aproveite a estadia, mantenha o foco no personagem e bom jogo! 🤝🔥`
+            )
             .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+            .setFooter({ 
+                text: `Membro nº ${guild.memberCount} • ${BOT_NAME}`, 
+                iconURL: guild.iconURL({ dynamic: true }) 
+            })
             .setTimestamp();
+
         welcomeChannel.send({ content: `👋 Salve ${member}!`, embeds: [welcomeEmbed] });
     }
 });
 
-// --- 🚪 SAÍDA / BANIMENTO ---
+// --- 🚪 EVENTO DE SAÍDA / BANIMENTO DE MEMBRO ---
 client.on('guildMemberRemove', async (member) => {
     const guild = member.guild;
     const channel = guild.channels.cache.get(WELCOME_CHANNEL_ID) || guild.systemChannel;
     if (!channel) return;
 
     await new Promise(resolve => setTimeout(resolve, 1500));
+
     let wasBanned = false;
     try {
-        const fetchedLogs = await guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberBanAdd });
+        const fetchedLogs = await guild.fetchAuditLogs({
+            limit: 1,
+            type: AuditLogEvent.MemberBanAdd,
+        });
+
         const banLog = fetchedLogs.entries.first();
         if (banLog && banLog.target.id === member.id && (Date.now() - banLog.createdAt.getTime() < 6000)) {
             wasBanned = true;
         }
-    } catch (e) {}
+    } catch (e) {
+        console.error("Erro ao buscar logs de banimento:", e);
+    }
 
     if (wasBanned) {
-        channel.send({ embeds: [new EmbedBuilder().setColor('#FF0000').setTitle(`⛔ MEMBRO BANIDO!`).setDescription(`O usuário **${member.user.tag}** vacilou e foi **BANIDO**! 🔨⚡`)] }).catch(() => {});
+        const banEmbed = new EmbedBuilder()
+            .setColor('#FF0000')
+            .setTitle(`⛔ MEMBRO BANIDO!`)
+            .setDescription(`O usuário **${member.user.tag}** vacilou, quebrou as regras e foi **BANIDO** da nossa comunidade! 🔨⚡`)
+            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+            .setFooter({ text: BOT_NAME })
+            .setTimestamp();
+
+        await channel.send({ embeds: [banEmbed] }).catch(() => {});
     } else {
-        channel.send({ embeds: [new EmbedBuilder().setColor('#FFA500').setTitle(`👋 MEMBRO SAIU`).setDescription(`O usuário **${member.user.tag}** meteu o pé do servidor. Valeu pela caminhada! 🤝`)] }).catch(() => {});
+        const leaveEmbed = new EmbedBuilder()
+            .setColor('#FFA500')
+            .setTitle(`👋 MEMBRO SAIU`)
+            .setDescription(`O usuário **${member.user.tag}** meteu o pé do servidor. Valeu pela caminhada e boa sorte no corre! 🤝`)
+            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+            .setFooter({ text: BOT_NAME })
+            .setTimestamp();
+
+        await channel.send({ embeds: [leaveEmbed] }).catch(() => {});
     }
 });
 
-// --- MENSAGENS E COMANDOS COM '+' ---
+// 🛡️ ANTI-RAID: CRIAÇÃO DE CANAIS EM MASSA
+client.on('guildChannelCreate', async (channel) => {
+    if (!antiRaidActive) return;
+    const guild = channel.guild;
+
+    try {
+        const fetchedLogs = await guild.fetchAuditLogs({
+            limit: 1,
+            type: AuditLogEvent.ChannelCreate,
+        });
+
+        const channelLog = fetchedLogs.entries.first();
+        if (!channelLog) return;
+
+        const { executor } = channelLog;
+        if (!executor || executor.bot || executor.id === OWNER_ID) return;
+
+        const now = Date.now();
+        if (!channelCreations.has(executor.id)) {
+            channelCreations.set(executor.id, []);
+        }
+
+        const userTimestamps = channelCreations.get(executor.id);
+        userTimestamps.push(now);
+
+        const windowStart = now - CHANNEL_CREATION_TIME;
+        const recentCreations = userTimestamps.filter(time => time > windowStart);
+        channelCreations.set(executor.id, recentCreations);
+
+        if (recentCreations.length >= CHANNEL_CREATION_LIMIT) {
+            const memberToBan = await guild.members.fetch(executor.id).catch(() => null);
+            if (memberToBan) {
+                await memberToBan.ban({ reason: "Anti-Raid: Tentativa de criação em massa de canais." });
+
+                const alertChannel = guild.systemChannel || guild.channels.cache.get(WELCOME_CHANNEL_ID);
+                if (alertChannel) {
+                    const banEmbed = new EmbedBuilder()
+                        .setColor('#FF0000')
+                        .setTitle(`🚨 TENTARAM BUGAR A BASE E DANÇARAM! 🚨`)
+                        .setDescription(`Anti-raid ativado. Quem tentar fazer graça não vai conseguir, vai ser kickado na hora e vai tomar!\n\nO comédia do **${executor.tag}** achou que ia lotar de canal e tomou **BAN PERMANENTE** na hora! ⚡`);
+                    
+                    alertChannel.send({ embeds: [banEmbed] });
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Erro no sistema anti-raid de canais:", e);
+    }
+});
+
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+    if (!oldMember.premiumSince && newMember.premiumSince) {
+        try {
+            await newMember.roles.add(ROLE_BOOSTER_ID);
+        } catch (e) {
+            console.error("Erro ao atribuir cargo de booster:", e);
+        }
+    }
+});
+
+// --- COMANDOS TRADICIONAIS E CANAL ARMADILHA ---
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
-    console.log(`Mensagem recebida de ${message.author.tag}: ${message.content}`);
-
-    // Canal Armadilha (HoneyPot)
-    if (message.channel.id === TRAP_CHANNEL_ID) {
-        if (message.author.id !== IMMUNE_USER_ID) {
-            try {
-                await message.delete().catch(() => {});
-                if (message.member && message.member.kickable) {
-                    await message.member.kick("Digitou no canal armadilha.");
-                    const logChannel = message.guild.channels.cache.get(WELCOME_CHANNEL_ID) || message.guild.systemChannel;
-                    if (logChannel) logChannel.send(`🪤 O usuário **${message.author.tag}** caiu na armadilha e foi **EXPULSO**!`);
-                }
-            } catch (err) {}
-            return;
-        }
-    }
-
-    // Comando +antiraid
+    // 1. Processar Comandos com Prefixos primeiro
     if (message.content.startsWith('+antiraid')) {
         if (message.author.id !== OWNER_ID) {
             return message.reply("❌ **Acesso negado!** Só o chefe pode mexer na segurança da quebrada.");
         }
+
         const args = message.content.split(' ');
         const option = args[1]?.toLowerCase();
 
         if (option === 'off' || option === 'desativar') {
             antiRaidActive = false;
-            return message.reply("⚠️ **Anti-Raid desligado!**");
+            return message.reply("⚠️ **Anti-Raid desligado!** A firma tá vulnerável, cuidado.");
         } else if (option === 'on' || option === 'ativar') {
             antiRaidActive = true;
-            return message.reply({ embeds: [new EmbedBuilder().setColor('#00FF00').setTitle(`🛡️ ESCUDO LIGADO!`).setDescription(`Anti-raid ativado. Quem tentar não vai conseguir, vai ser kickado na hora e vai tomar.`)] });
+            
+            const ligadoEmbed = new EmbedBuilder()
+                .setColor('#00FF00')
+                .setTitle(`🛡️ ESCUDO LIGADO! A FIRMA TÁ BLINDADA! 🛡️`)
+                .setDescription(`Anti-raid ativado. Quem tentar fazer gracinha não vai conseguir, vai ser kickado na hora e vai tomar!`);
+            
+            return message.reply({ embeds: [ligadoEmbed] });
         } else {
-            return message.reply(`Situação do Anti-Raid: **${antiRaidActive ? 'ATIVADO ✅' : 'DESATIVADO ❌'}**`);
+            return message.reply(`Situação do Anti-Raid: **${antiRaidActive ? 'ATIVADO ✅' : 'DESATIVADO ❌'}**\nManda \`+antiraid on\` para blindar ou \`+antiraid off\` para desativar.`);
         }
     }
 
-    // Comando +bateponto
     if (message.content === '+bateponto') {
         const embed = new EmbedBuilder()
             .setColor('#800080')
@@ -195,9 +331,9 @@ client.on('messageCreate', async (message) => {
 
         await message.channel.send({ embeds: [embed], components: [row] });
         await message.delete().catch(() => {});
+        return;
     }
 
-    // Comando +painelticket
     if (message.content === '+painelticket') {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply("Apenas administradores podem usar este comando.");
@@ -244,9 +380,9 @@ client.on('messageCreate', async (message) => {
 
         await message.channel.send({ embeds: [embed], components: [row1, row2] });
         await message.delete().catch(() => {});
+        return;
     }
 
-    // Comando +regras
     if (message.content === '+regras') {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply("Apenas administradores podem usar este comando.");
@@ -278,17 +414,101 @@ client.on('messageCreate', async (message) => {
 
         await message.channel.send({ embeds: [regrasEmbed, punicoesEmbed] });
         await message.delete().catch(() => {});
+        return;
+    }
+
+    // 2. Sistema de Canal Armadilha (HoneyPot) com exceção para os IDs imunes
+    if (message.channel.id === TRAP_CHANNEL_ID) {
+        if (!IMMUNE_USERS.includes(message.author.id)) {
+            try {
+                await message.delete().catch(() => {});
+                if (message.member && message.member.kickable) {
+                    await message.member.kick("Digitou no canal armadilha (HoneyPot).");
+                    
+                    const logChannel = message.guild.channels.cache.get(WELCOME_CHANNEL_ID) || message.guild.systemChannel;
+                    if (logChannel) {
+                        logChannel.send(`🪤 **[ARMADILHA]** O usuário **${message.author.tag}** caiu na armadilha ao digitar no canal proibido e foi **EXPULSO**!`);
+                    }
+                }
+            } catch (err) {
+                console.error("Erro ao aplicar o kick da armadilha:", err);
+            }
+            return;
+        }
     }
 });
 
-// --- INTERAÇÕES (SLASH, BOTÕES E MENUS) ---
+// --- 🎯 TRATAMENTO DOS COMANDOS SLASH E INTERAÇÕES ---
 client.on('interactionCreate', async (interaction) => {
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
-        if (commandName === 'alianca') return await interaction.reply({ content: `PARCERIA 🤝\n\nNOME FAC:\n\nQUANTOS MEMBROS:\n\nFAC OFICIAL: \n\nLIDER:` });
-        if (commandName === 'xfac') return await interaction.reply({ content: `# xfac\n\n> Fac:\n\n> Valor:\n\n> Horário:\n\n> Quantos v quantos:\n\n> Regras:\n\n> Local: \n\n> Melhor de quantos:` });
-        if (commandName === 'transferencia') return await interaction.reply({ content: `TRANSFERÊNCIA PARA A BALLA\n\n**Olá, estarei realizando sua \ntransferência!\n\n> Seu Nick:\n\n> Sua facção:\n\n> Cargo desejado:\n\n> Provas/ print :**` });
-        if (commandName === 'rec') return await interaction.reply({ content: `**RECRUTAMENTO | BALLA**\n\n📋 **IDENTIFICAÇÃO**\n\n👤 Nome:\n> \n\n🎂 Idade real:\n> \n\n🎮 Nick Roblox:\n> \n\n💬 Nick Discord:\n> \n\n⏰ Horário disponível:\n> \n\n🧁 Já participou de outra facção? Qual?\n> \n\n━━━━━━━━━━━━━━\n\n📜 **RP**\n\n🔫 RDM:\n> \n\n🕵️ CL:\n> \n\n🚗 VDM:\n> \n\n🌙 Dark RP:\n> \n\n🚫 Anti-RP:\n> \n\n━━━━━━━━━━━━━━\n\n👤 **PERFIL**\n\n🤿 O que é maturidade?\n> \n\n📊 Nota de maturidade (0-10):\n> \n\n Por que entrar no Gangue do ovo roxo ?\n> \n\n💪 Melhor qualidade:\n> \n\n⚠️ Maior defeito:\n> \n\n🚔 Como reagiria a uma abordagem policial no RP?\n> \n\n━━━━━━━━━━━━━━\n\n🎧 **EXTRAS**\n\n🎙️ Possui microfone?\n> \n\n🎮 Joga em equipe ou sozinho?\n> ` });
+
+        if (commandName === 'alianca') {
+            const aliancaMsg = 
+                `PARCERIA 🤝\n\n` +
+                `NOME FAC:\n\n` +
+                `QUANTOS MEMBROS:\n\n` +
+                `FAC OFICIAL: \n\n` +
+                `LIDER:`;
+            return await interaction.reply({ content: aliancaMsg });
+        }
+
+        if (commandName === 'xfac') {
+            const xfacMsg = 
+                `# xfac\n\n` +
+                `> Fac:\n\n` +
+                `> Valor:\n\n` +
+                `> Horário:\n\n` +
+                `> Quantos v quantos:\n\n` +
+                `> Regras:\n\n` +
+                `> Local: \n\n` +
+                `> Melhor de quantos:`;
+            return await interaction.reply({ content: xfacMsg });
+        }
+
+        if (commandName === 'transferencia') {
+            const transMsg = 
+                `TRANSFERÊNCIA PARA A BALLA\n\n` +
+                `**Olá, estarei realizando sua \n` +
+                `transferência!\n\n` +
+                `> Seu Nick:\n\n` +
+                `> Sua facção:\n\n` +
+                `> Cargo desejado:\n\n` +
+                `> Provas/ print :**`;
+            return await interaction.reply({ content: transMsg });
+        }
+
+        if (commandName === 'rec') {
+            const recMsg = 
+                `**RECRUTAMENTO | BALLA**\n\n` +
+                `📋 **IDENTIFICAÇÃO**\n\n` +
+                `👤 Nome:\n> \n\n` +
+                `🎂 Idade real:\n> \n\n` +
+                `🎮 Nick Roblox:\n> \n\n` +
+                `💬 Nick Discord:\n> \n\n` +
+                `⏰ Horário disponível:\n> \n\n` +
+                `🧁 Já participou de outra facção? Qual?\n> \n\n` +
+                `━━━━━━━━━━━━━━\n\n` +
+                `📜 **RP**\n\n` +
+                `🔫 RDM:\n> \n\n` +
+                `🕵️ CL:\n> \n\n` +
+                `🚗 VDM:\n> \n\n` +
+                `🌙 Dark RP:\n> \n\n` +
+                `🚫 Anti-RP:\n> \n\n` +
+                `━━━━━━━━━━━━━━\n\n` +
+                `👤 **PERFIL**\n\n` +
+                `🤿 O que é maturidade?\n> \n\n` +
+                `📊 Nota de maturidade (0-10):\n> \n\n` +
+                ` Por que entrar no Gangue do ovo roxo ?\n> \n\n` +
+                `💪 Melhor qualidade:\n> \n\n` +
+                `⚠️ Maior defeito:\n> \n\n` +
+                `🚔 Como reagiria a uma abordagem policial no RP?\n> \n\n` +
+                `━━━━━━━━━━━━━━\n\n` +
+                `🎧 **EXTRAS**\n\n` +
+                `🎙️ Possui microfone?\n> \n\n` +
+                `🎮 Joga em equipe ou sozinho?\n> `;
+            return await interaction.reply({ content: recMsg });
+        }
     }
 
     if (interaction.isButton()) {
@@ -304,21 +524,30 @@ client.on('interactionCreate', async (interaction) => {
 
         if (interaction.customId === 'ponto_encerrar') {
             const pontoData = activePoints.get(userId);
-            if (!pontoData) return await interaction.reply({ content: `❌ Você não iniciou nenhum ponto ainda!`, ephemeral: true });
+            if (!pontoData) {
+                return await interaction.reply({ content: `❌ Você não iniciou nenhum ponto ainda! Clique em "Iniciar Ponto" primeiro.`, ephemeral: true });
+            }
 
             const diffMs = now - pontoData.startTime;
             const diffSec = Math.floor(diffMs / 1000);
             const minutes = Math.floor(diffSec / 60);
             const hours = Math.floor(minutes / 60);
+            const displayMin = minutes % 60;
+            const displaySec = diffSec % 60;
+
+            let tempoTotalStr = '';
+            if (hours > 0) tempoTotalStr += `${hours} hora(s) `;
+            if (displayMin > 0 || hours > 0) tempoTotalStr += `${displayMin} minuto(s) `;
+            tempoTotalStr += `${displaySec} segundo(s)`;
 
             const pontoEmbed = new EmbedBuilder()
                 .setColor('#800080')
                 .setTitle(`⏱️ Registo de Ponto — ${BOT_NAME}`)
                 .addFields(
-                    { name: 'Usuário:', value: `${interaction.user}` },
-                    { name: 'Início:', value: `${pontoData.startStr}` },
-                    { name: 'Termino:', value: `${dataFormatada}` },
-                    { name: 'Tempo total:', value: `${hours}h ${minutes % 60}m ${diffSec % 60}s` }
+                    { name: 'Usuário:', value: `${interaction.user}`, inline: false },
+                    { name: 'Início:', value: `${pontoData.startStr}`, inline: false },
+                    { name: 'Termino:', value: `${dataFormatada}`, inline: false },
+                    { name: 'Tempo total:', value: `${tempoTotalStr}`, inline: false }
                 )
                 .setFooter({ text: `Sistema desenvolvido pela krozz • ${BOT_NAME}` })
                 .setTimestamp();
@@ -330,7 +559,9 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.customId === 'close_ticket') {
             const channel = interaction.channel;
             await interaction.reply({ content: '🔒 Fechando ticket em 5 segundos...' });
-            setTimeout(() => channel.delete().catch(() => {}), 5000);
+            setTimeout(() => {
+                channel.delete().catch(() => {});
+            }, 5000);
         }
     }
 
@@ -344,22 +575,39 @@ client.on('interactionCreate', async (interaction) => {
                 name: `${ticketType}-${member.username}`,
                 type: ChannelType.GuildText,
                 permissionOverwrites: [
-                    { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-                    { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
-                    { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels] }
+                    {
+                        id: guild.id,
+                        deny: [PermissionsBitField.Flags.ViewChannel],
+                    },
+                    {
+                        id: member.id,
+                        allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory],
+                    },
+                    {
+                        id: client.user.id,
+                        allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels],
+                    }
                 ],
             });
 
-            const closeRow = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('close_ticket').setLabel('Fechar Ticket').setStyle(ButtonStyle.Danger).setEmoji('🔒'));
-            const openedEmbed = new EmbedBuilder().setColor('#800080').setTitle(`Ticket: ${ticketType.toUpperCase().replace('_', ' ')}`).setDescription(`Olá ${member}, seu ticket foi aberto com sucesso!\nExplique o motivo do seu contato e aguarde a equipe responsável (${BOT_NAME}).`);
+            const closeRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('close_ticket').setLabel('Fechar Ticket').setStyle(ButtonStyle.Danger).setEmoji('🔒')
+            );
+
+            const openedEmbed = new EmbedBuilder()
+                .setColor('#800080')
+                .setTitle(`Ticket: ${ticketType.toUpperCase().replace('_', ' ')}`)
+                .setDescription(`Olá ${member}, seu ticket foi aberto com sucesso!\nExplique o motivo do seu contato e aguarde a equipe responsável (${BOT_NAME}).`);
 
             await ticketChannel.send({ content: `${member}`, embeds: [openedEmbed], components: [closeRow] });
             await interaction.reply({ content: `✅ Seu ticket foi aberto em: ${ticketChannel}`, ephemeral: true });
+
         } catch (error) {
+            console.error(error);
             await interaction.reply({ content: '❌ Ocorreu um erro ao criar o seu ticket.', ephemeral: true });
         }
     }
 });
 
+// Login do bot
 client.login(process.env.DISCORD_TOKEN);
-
