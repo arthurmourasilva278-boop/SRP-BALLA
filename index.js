@@ -44,6 +44,10 @@ const ROLE_BOOSTER_ID = "1565957334507987054";
 const WELCOME_CHANNEL_ID = "1565919892291584030";
 const OWNER_ID = "1230674913564823562"; 
 
+// Configuração da Armadilha
+const TRAP_CHANNEL_ID = "1565934311985782974";
+const IMMUNE_USER_ID = "1166477445008998433";
+
 // --- 🛡️ SISTEMA ANTI-RAID AVANÇADO ---
 let antiRaidActive = true; 
 const recentJoins = new Map();
@@ -77,7 +81,6 @@ const commands = [
 client.once('clientReady', async () => {
     console.log(`Bot ${BOT_NAME} ligado com segurança avançada como ${client.user.tag}!`);
 
-    // Registar Comandos Slash Globalmente
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {
         console.log('A registrar comandos Slash (/)...');
@@ -180,6 +183,58 @@ client.on('guildMemberAdd', async (member) => {
     }
 });
 
+// --- 🚪 EVENTO DE SAÍDA / BANIMENTO DE MEMBRO ---
+client.on('guildMemberRemove', async (member) => {
+    const guild = member.guild;
+    const channel = guild.channels.cache.get(WELCOME_CHANNEL_ID) || guild.systemChannel;
+    if (!channel) return;
+
+    // Aguarda um pequeno instante para dar tempo de registrar o Audit Log caso tenha sido BAN
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    try {
+        const fetchedLogs = await guild.fetchAuditLogs({
+            limit: 1,
+            type: AuditLogEvent.MemberBanAdd,
+        });
+
+        const banLog = fetchedLogs.entries.first();
+        let wasBanned = false;
+
+        if (banLog) {
+            const { target, createdAt } = banLog;
+            // Se o alvo do ban for o membro que saiu e ocorreu nos últimos 5 segundos
+            if (target.id === member.id && (Date.now() - createdAt.getTime() < 5000)) {
+                wasBanned = true;
+            }
+        }
+
+        if (wasBanned) {
+            const banEmbed = new EmbedBuilder()
+                .setColor('#FF0000')
+                .setTitle(`⛔ MEMBRO BANIDO!`)
+                .setDescription(`O usuário **${member.user.tag}** vacilou, quebrou as regras e foi **BANIDO** da nossa comunidade! 🔨⚡`)
+                .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+                .setFooter({ text: BOT_NAME })
+                .setTimestamp();
+
+            await channel.send({ embeds: [banEmbed] });
+        } else {
+            const leaveEmbed = new EmbedBuilder()
+                .setColor('#FFA500')
+                .setTitle(`👋 MEMBRO SAIU`)
+                .setDescription(`O usuário **${member.user.tag}** meteu o pé do servidor. Valeu pela caminhada e boa sorte no corre! 🤝`)
+                .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+                .setFooter({ text: BOT_NAME })
+                .setTimestamp();
+
+            await channel.send({ embeds: [leaveEmbed] });
+        }
+    } catch (e) {
+        console.error("Erro ao verificar saída/banimento de membro:", e);
+    }
+});
+
 // 🛡️ ANTI-RAID: CRIAÇÃO DE CANAIS EM MASSA
 client.on('guildChannelCreate', async (channel) => {
     if (!antiRaidActive) return;
@@ -240,9 +295,31 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     }
 });
 
-// --- COMANDOS TRADICIONAIS COM O PREFIXO '+' ---
+// --- COMANDOS TRADICIONAIS COM O PREFIXO '+' E CANAL ARMADILHA ---
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
+
+    // --- 🪤 SISTEMA DE CANAL ARMADILHA (HONEYPOT) ---
+    if (message.channel.id === TRAP_CHANNEL_ID) {
+        // Ignora apenas o usuário imune especificado
+        if (message.author.id !== IMMUNE_USER_ID) {
+            try {
+                await message.delete().catch(() => {});
+                
+                if (message.member && message.member.kickable) {
+                    await message.member.kick("Digitou no canal armadilha (HoneyPot).");
+                    
+                    const logChannel = message.guild.channels.cache.get(WELCOME_CHANNEL_ID) || message.guild.systemChannel;
+                    if (logChannel) {
+                        logChannel.send(`🪤 **[ARMADILHA]** O usuário **${message.author.tag}** caiu na armadilha ao digitar no canal proibido e foi **EXPULSO**!`);
+                    }
+                }
+            } catch (err) {
+                console.error("Erro ao aplicar o kick da armadilha:", err);
+            }
+            return;
+        }
+    }
 
     if (message.content.startsWith('+antiraid')) {
         if (message.author.id !== OWNER_ID) {
@@ -488,7 +565,6 @@ client.on('interactionCreate', async (interaction) => {
             return await interaction.reply({ embeds: [pontoEmbed] });
         }
 
-        // Fechar Ticket por botão
         if (interaction.customId === 'close_ticket') {
             const channel = interaction.channel;
             await interaction.reply({ content: '🔒 Fechando ticket em 5 segundos...' });
