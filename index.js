@@ -181,7 +181,7 @@ client.on('guildMemberAdd', async (member) => {
                 `📜 **1. Fique por dentro:** Leia nossas regras no canal oficial.\n` +
                 `🎫 **2. Atendimento:** Abra um ticket caso precise de suporte, transferências ou pagar metas.\n` +
                 `🚀 **3. Impulsione:** Deixe seu **Boost** no servidor e ganhe seu cargo VIP automaticamente!\n\n` +
-                `Aproveite a estadia, mantenha o personagem e bom jogo! 🤝🔥`
+                `Aproveite a estadia, mantenha o foco no personagem e bom jogo! 🤝🔥`
             )
             .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
             .setFooter({ 
@@ -300,11 +300,11 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     }
 });
 
-// --- COMANDOS TRADICIONAIS E CANAL ARMADILHA (COM PRIORIDADE ABSOLUTA) ---
+// --- COMANDOS TRADICIONAIS E CANAL ARMADILHA ---
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
-    // 1. PRIMEIRO DE TUDO: Processar Comandos com o prefixo '+' em qualquer canal
+    // 1. Processar Comandos com Prefixos primeiro
     if (message.content.startsWith('+antiraid')) {
         if (message.author.id !== OWNER_ID) {
             return message.reply("❌ **Acesso negado!** Só o chefe pode mexer na segurança da quebrada.");
@@ -429,7 +429,7 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    // 2. DEPOIS DOS COMANDOS, VERIFICAMOS O CANAL ARMADILHA (HONEYPOT)
+    // 2. Sistema de Canal Armadilha (HoneyPot) com exceção para os IDs imunes
     if (message.channel.id === TRAP_CHANNEL_ID) {
         if (!IMMUNE_USERS.includes(message.author.id)) {
             try {
