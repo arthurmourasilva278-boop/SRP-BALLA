@@ -57,7 +57,6 @@ const giveawayParticipants = new Map();
 const ANTI_RAID_LIMIT = 5;       
 const ANTI_RAID_TIME = 10000;    
 const MIN_ACCOUNT_AGE = 7 * 24 * 60 * 60 * 1000; 
-
 const CHANNEL_CREATION_LIMIT = 3; 
 const CHANNEL_CREATION_TIME = 5000; 
 
@@ -93,8 +92,7 @@ client.once('ready', async () => {
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {
-        console.log('A registrar comandos Slash (/)...');
-        // Registo direto e instantâneo por guild para aparecer imediatamente no servidor
+        console.log('A registrar comandos Slash de forma instantânea...');
         const guilds = client.guilds.cache.map(guild => guild.id);
         for (const guildId of guilds) {
             await rest.put(Routes.applicationGuildCommands(client.user.id, guildId), { body: commands });
@@ -178,7 +176,57 @@ client.on('guildMemberRemove', async (member) => {
     }
 });
 
-// --- APENAS CANAL ARMADILHA NO MESSAGE CREATE ---
+// --- 🛡️ ANTI-RAID: CRIAÇÃO DE CANAIS EM MASSA ---
+client.on('guildChannelCreate', async (channel) => {
+    if (!antiRaidActive) return;
+    const guild = channel.guild;
+
+    try {
+        const fetchedLogs = await guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.ChannelCreate });
+        const channelLog = fetchedLogs.entries.first();
+        if (!channelLog) return;
+
+        const { executor } = channelLog;
+        if (!executor || executor.bot || executor.id === OWNER_ID) return;
+
+        const now = Date.now();
+        if (!channelCreations.has(executor.id)) {
+            channelCreations.set(executor.id, []);
+        }
+
+        const userTimestamps = channelCreations.get(executor.id);
+        userTimestamps.push(now);
+
+        const windowStart = now - CHANNEL_CREATION_TIME;
+        const recentCreations = userTimestamps.filter(time => time > windowStart);
+        channelCreations.set(executor.id, recentCreations);
+
+        if (recentCreations.length >= CHANNEL_CREATION_LIMIT) {
+            const memberToBan = await guild.members.fetch(executor.id).catch(() => null);
+            if (memberToBan) {
+                await memberToBan.ban({ reason: "Anti-Raid: Tentativa de criação em massa de canais." });
+                const alertChannel = guild.systemChannel || guild.channels.cache.get(WELCOME_CHANNEL_ID);
+                if (alertChannel) {
+                    const banEmbed = new EmbedBuilder()
+                        .setColor('#FF0000')
+                        .setTitle(`🚨 TENTARAM BUGAR A BASE E DANÇARAM! 🚨`)
+                        .setDescription(`O comédia do **${executor.tag}** tentou criar canais em massa e tomou **BAN PERMANENTE**! ⚡`);
+                    alertChannel.send({ embeds: [banEmbed] });
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Erro no anti-raid de canais:", e);
+    }
+});
+
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+    if (!oldMember.premiumSince && newMember.premiumSince) {
+        await newMember.roles.add(ROLE_BOOSTER_ID).catch(() => {});
+    }
+});
+
+// --- 🪤 CANAL ARMADILHA (HONEYPOT) ---
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
@@ -189,7 +237,9 @@ client.on('messageCreate', async (message) => {
                 if (message.member && message.member.kickable) {
                     await message.member.kick("Digitou no canal armadilha.");
                     const logChannel = message.guild.channels.cache.get(WELCOME_CHANNEL_ID) || message.guild.systemChannel;
-                    if (logChannel) logChannel.send(`🪤 O usuário **${message.author.tag}** caiu na armadilha e foi **EXPULSO**!`);
+                    if (logChannel) {
+                        logChannel.send(`🪤 **[ARMADILHA]** O usuário **${message.author.tag}** caiu na armadilha e foi **EXPULSO**!`);
+                    }
                 }
             } catch (err) {}
             return;
@@ -197,7 +247,7 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// --- 🎯 TRATAMENTO DE INTERAÇÕES (COMANDOS SLASH) ---
+// --- 🎯 PROCESSAMENTO DE COMANDOS SLASH E INTERAÇÕES ---
 client.on('interactionCreate', async (interaction) => {
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
@@ -273,7 +323,7 @@ client.on('interactionCreate', async (interaction) => {
                 return await interaction.reply({ content: "⚠️ **Anti-Raid desligado!**", ephemeral: true });
             } else {
                 antiRaidActive = true;
-                return await interaction.reply({ embeds: [new EmbedBuilder().setColor('#00FF00').setTitle(`🛡️ ESCUDO LIGADO!`).setDescription(`Anti-raid ativado. Quem tentar fazer gracinha vai tomar!`)] });
+                return await interaction.reply({ embeds: [new EmbedBuilder().setColor('#00FF00'].setTitle(`🛡️ ESCUDO LIGADO!`).setDescription(`Anti-raid ativado com sucesso!`)] });
             }
         }
 
