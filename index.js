@@ -1,4 +1,4 @@
-
+ 
 const { 
     Client, 
     GatewayIntentBits, 
@@ -145,7 +145,6 @@ client.on('guildMemberRemove', async (member) => {
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
-    // Log para depuração no Render (vês no console se o bot está a ler as mensagens)
     console.log(`Mensagem recebida de ${message.author.tag}: ${message.content}`);
 
     // Canal Armadilha (HoneyPot)
@@ -207,32 +206,43 @@ client.on('messageCreate', async (message) => {
         const embed = new EmbedBuilder()
             .setColor('#800080')
             .setTitle(`🎟️ Central de Atendimento — ${BOT_NAME}`)
-            .setDescription('Central de atendimento\n\n• Um canal privado será criado para você');
+            .setDescription(
+                'Central de atendimento\n\n' +
+                '• Um canal privado será criado apenas para você\n\n' +
+                '• Apenas você e nossa equipe de suporte terá acesso\n\n' +
+                '• Nossa equipe responderá o mais rápido possível\n\n' +
+                'IMPORTANTE\n' +
+                '• Use o sistema de ticket apenas para questões que precisam de suporte'
+            )
+            .setFooter({ text: `Desenvolvido por krozz • ${BOT_NAME}` });
 
         const optionsMenu = new StringSelectMenuBuilder()
             .setCustomId('menu_opcoes')
             .setPlaceholder('Opções')
             .addOptions([
-                { label: 'Falar com gestão', value: 'ticket_gestao', emoji: '🗣️' },
-                { label: 'Dúvidas', value: 'ticket_duvidas', emoji: '❓' },
-                { label: 'Outros', value: 'ticket_outros', emoji: '📌' },
-                { label: 'Alianças', value: 'ticket_aliancas', emoji: '🛡️' },
-                { label: 'Denúncias', value: 'ticket_denuncias', emoji: '🚨' },
-                { label: 'Booster', value: 'ticket_booster', emoji: '🚀' }
+                { label: 'Falar com gestão', description: 'Tratar assuntos diretamente com a gestão', value: 'ticket_gestao', emoji: '🗣️' },
+                { label: 'Dúvidas', description: 'Tirar dúvidas gerais sobre a facção/servidor', value: 'ticket_duvidas', emoji: '❓' },
+                { label: 'Outros', description: 'Outros assuntos não especificados', value: 'ticket_outros', emoji: '📌' },
+                { label: 'Alianças', description: 'Tratar sobre parcerias', value: 'ticket_aliancas', emoji: '🛡️' },
+                { label: 'Denúncias', description: 'Reportar infrações', value: 'ticket_denuncias', emoji: '🚨' },
+                { label: 'Booster', description: 'Benefícios de impulsionador', value: 'ticket_booster', emoji: '🚀' }
             ]);
 
         const factionMenu = new StringSelectMenuBuilder()
             .setCustomId('menu_faccao')
             .setPlaceholder('Facção')
             .addOptions([
-                { label: 'Xfac', value: 'ticket_xfac', emoji: '🤝' },
-                { label: 'Transferência', value: 'ticket_transferencia', emoji: '🔄' },
-                { label: 'Pagar Metas', value: 'ticket_pagarmetas', emoji: '💰' },
-                { label: 'Solicitar cargo', value: 'ticket_solicitar_cargo', emoji: '🏷️' },
-                { label: 'Recrutamento', value: 'ticket_recrutamento', emoji: '📥' }
+                { label: 'Xfac', description: 'Negociações e acordos entre facções', value: 'ticket_xfac', emoji: '🤝' },
+                { label: 'Transferência', description: 'Mudança de fac ou setor', value: 'ticket_transferencia', emoji: '🔄' },
+                { label: 'Pagar Metas', description: 'Envio de provas de metas', value: 'ticket_pagarmetas', emoji: '💰' },
+                { label: 'Solicitar cargo', description: 'Pedir ou ajustar seus cargos/setor', value: 'ticket_solicitar_cargo', emoji: '🏷️' },
+                { label: 'Recrutamento', description: 'Informações para entrada na fac', value: 'ticket_recrutamento', emoji: '📥' }
             ]);
 
-        await message.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(optionsMenu), new ActionRowBuilder().addComponents(factionMenu)] });
+        const row1 = new ActionRowBuilder().addComponents(optionsMenu);
+        const row2 = new ActionRowBuilder().addComponents(factionMenu);
+
+        await message.channel.send({ embeds: [embed], components: [row1, row2] });
         await message.delete().catch(() => {});
     }
 
@@ -241,8 +251,31 @@ client.on('messageCreate', async (message) => {
         if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return message.reply("Apenas administradores podem usar este comando.");
         }
-        const regrasEmbed = new EmbedBuilder().setColor('#800080').setTitle(`————————• REGRAS ——————————`).setDescription('• Proibido racismo\n• Respeitar a hierarquia\n• Siga as regras do RP');
-        const punicoesEmbed = new EmbedBuilder().setColor('#FF0000').setTitle(`————————• Punições ——————————`).setDescription('• Preconceitos: 1 a 7 dias');
+
+        const regrasEmbed = new EmbedBuilder()
+            .setColor('#800080')
+            .setTitle(`————————• REGRAS ——————————`)
+            .setDescription(
+                '• Proibido racismo\n' +
+                '• Proibido Gordofobia\n' +
+                '• Proibido Xenofobia\n' +
+                '• Sem nenhum tipo de preconceito\n' +
+                '• Respeitar a hierarquia\n' +
+                '• Respeitar os canais\n' +
+                '• Não sair do personagem\n' +
+                '• Siga as regras do RP'
+            );
+
+        const punicoesEmbed = new EmbedBuilder()
+            .setColor('#FF0000')
+            .setTitle(`————————• Punições ——————————`)
+            .setDescription(
+                '• **Preconceitos:** 1 a 7 dias *(racismo é perm)*\n' +
+                '• **Xingar sem motivo:** adv (1/3)\n' +
+                '• **Não respeitar a hierarquia:** adv (1/3)\n' +
+                '• **Não seguir as regras do RP:** Castigo (1/3), 1h pronto.'
+            );
+
         await message.channel.send({ embeds: [regrasEmbed, punicoesEmbed] });
         await message.delete().catch(() => {});
     }
@@ -252,10 +285,10 @@ client.on('messageCreate', async (message) => {
 client.on('interactionCreate', async (interaction) => {
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
-        if (commandName === 'alianca') return await interaction.reply({ content: `PARCERIA 🤝\n\nNOME FAC:\nQUANTOS MEMBROS:\nFAC OFICIAL:\nLIDER:` });
-        if (commandName === 'xfac') return await interaction.reply({ content: `# xfac\n> Fac:\n> Valor:\n> Horário:\n> Quantos v quantos:\n> Regras:\n> Local:\n> Melhor de quantos:` });
-        if (commandName === 'transferencia') return await interaction.reply({ content: `TRANSFERÊNCIA PARA A BALLA\n\n**Olá, estarei realizando sua transferência!\n> Seu Nick:\n> Sua facção:\n> Cargo desejado:\n> Provas/ print :**` });
-        if (commandName === 'rec') return await interaction.reply({ content: `**RECRUTAMENTO | BALLA**\n\n📋 **IDENTIFICAÇÃO**\n👤 Nome:\n> \n🎂 Idade real:\n> ` });
+        if (commandName === 'alianca') return await interaction.reply({ content: `PARCERIA 🤝\n\nNOME FAC:\n\nQUANTOS MEMBROS:\n\nFAC OFICIAL: \n\nLIDER:` });
+        if (commandName === 'xfac') return await interaction.reply({ content: `# xfac\n\n> Fac:\n\n> Valor:\n\n> Horário:\n\n> Quantos v quantos:\n\n> Regras:\n\n> Local: \n\n> Melhor de quantos:` });
+        if (commandName === 'transferencia') return await interaction.reply({ content: `TRANSFERÊNCIA PARA A BALLA\n\n**Olá, estarei realizando sua \ntransferência!\n\n> Seu Nick:\n\n> Sua facção:\n\n> Cargo desejado:\n\n> Provas/ print :**` });
+        if (commandName === 'rec') return await interaction.reply({ content: `**RECRUTAMENTO | BALLA**\n\n📋 **IDENTIFICAÇÃO**\n\n👤 Nome:\n> \n\n🎂 Idade real:\n> \n\n🎮 Nick Roblox:\n> \n\n💬 Nick Discord:\n> \n\n⏰ Horário disponível:\n> \n\n🧁 Já participou de outra facção? Qual?\n> \n\n━━━━━━━━━━━━━━\n\n📜 **RP**\n\n🔫 RDM:\n> \n\n🕵️ CL:\n> \n\n🚗 VDM:\n> \n\n🌙 Dark RP:\n> \n\n🚫 Anti-RP:\n> \n\n━━━━━━━━━━━━━━\n\n👤 **PERFIL**\n\n🤿 O que é maturidade?\n> \n\n📊 Nota de maturidade (0-10):\n> \n\n Por que entrar no Gangue do ovo roxo ?\n> \n\n💪 Melhor qualidade:\n> \n\n⚠️ Maior defeito:\n> \n\n🚔 Como reagiria a uma abordagem policial no RP?\n> \n\n━━━━━━━━━━━━━━\n\n🎧 **EXTRAS**\n\n🎙️ Possui microfone?\n> \n\n🎮 Joga em equipe ou sozinho?\n> ` });
     }
 
     if (interaction.isButton()) {
@@ -266,17 +299,18 @@ client.on('interactionCreate', async (interaction) => {
 
         if (interaction.customId === 'ponto_iniciar') {
             activePoints.set(userId, { startTime: now, startStr: dataFormatada });
-            return await interaction.reply({ content: `🟢 Ponto iniciado às **${dataFormatada}**!`, ephemeral: true });
+            return await interaction.reply({ content: `🟢 Ponto iniciado com sucesso às **${dataFormatada}**!`, ephemeral: true });
         }
 
         if (interaction.customId === 'ponto_encerrar') {
             const pontoData = activePoints.get(userId);
-            if (!pontoData) return await interaction.reply({ content: `❌ Não iniciou nenhum ponto ainda!`, ephemeral: true });
+            if (!pontoData) return await interaction.reply({ content: `❌ Você não iniciou nenhum ponto ainda!`, ephemeral: true });
 
-            const diffSec = Math.floor((now - pontoData.startTime) / 1000);
+            const diffMs = now - pontoData.startTime;
+            const diffSec = Math.floor(diffMs / 1000);
             const minutes = Math.floor(diffSec / 60);
             const hours = Math.floor(minutes / 60);
-            
+
             const pontoEmbed = new EmbedBuilder()
                 .setColor('#800080')
                 .setTitle(`⏱️ Registo de Ponto — ${BOT_NAME}`)
@@ -285,7 +319,9 @@ client.on('interactionCreate', async (interaction) => {
                     { name: 'Início:', value: `${pontoData.startStr}` },
                     { name: 'Termino:', value: `${dataFormatada}` },
                     { name: 'Tempo total:', value: `${hours}h ${minutes % 60}m ${diffSec % 60}s` }
-                );
+                )
+                .setFooter({ text: `Sistema desenvolvido pela krozz • ${BOT_NAME}` })
+                .setTimestamp();
 
             activePoints.delete(userId);
             return await interaction.reply({ embeds: [pontoEmbed] });
@@ -309,20 +345,21 @@ client.on('interactionCreate', async (interaction) => {
                 type: ChannelType.GuildText,
                 permissionOverwrites: [
                     { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-                    { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
-                    { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
+                    { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+                    { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels] }
                 ],
             });
 
             const closeRow = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('close_ticket').setLabel('Fechar Ticket').setStyle(ButtonStyle.Danger).setEmoji('🔒'));
-            const openedEmbed = new EmbedBuilder().setColor('#800080').setTitle(`Ticket: ${ticketType.toUpperCase()}`).setDescription(`Olá ${member}, ticket aberto com sucesso!`);
-            
+            const openedEmbed = new EmbedBuilder().setColor('#800080').setTitle(`Ticket: ${ticketType.toUpperCase().replace('_', ' ')}`).setDescription(`Olá ${member}, seu ticket foi aberto com sucesso!\nExplique o motivo do seu contato e aguarde a equipe responsável (${BOT_NAME}).`);
+
             await ticketChannel.send({ content: `${member}`, embeds: [openedEmbed], components: [closeRow] });
-            await interaction.reply({ content: `✅ Ticket aberto em: ${ticketChannel}`, ephemeral: true });
+            await interaction.reply({ content: `✅ Seu ticket foi aberto em: ${ticketChannel}`, ephemeral: true });
         } catch (error) {
-            await interaction.reply({ content: '❌ Erro ao criar ticket.', ephemeral: true });
+            await interaction.reply({ content: '❌ Ocorreu um erro ao criar o seu ticket.', ephemeral: true });
         }
     }
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
