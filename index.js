@@ -39,6 +39,7 @@ const client = new Client({
 });
 
 const BOT_NAME = "SRP | BALLA";
+const PREFIX = ";";
 const ROLE_BOOSTER_ID = "1565957334507987054";
 const WELCOME_CHANNEL_ID = "1565919892291584030";
 const OWNER_ID = "1230674913564823562"; 
@@ -60,26 +61,12 @@ const MIN_ACCOUNT_AGE = 7 * 24 * 60 * 60 * 1000;
 const CHANNEL_CREATION_LIMIT = 3; 
 const CHANNEL_CREATION_TIME = 5000; 
 
-// --- ⚡ DEFINIÇÃO DE TODOS OS COMANDOS SLASH ---
+// --- ⚡ DEFINIÇÃO DOS COMANDOS SLASH ---
 const commands = [
     new SlashCommandBuilder().setName('alianca').setDescription('Envia a ficha de parceria/aliança.'),
     new SlashCommandBuilder().setName('xfac').setDescription('Envia a ficha de desafio Xfac.'),
     new SlashCommandBuilder().setName('transferencia').setDescription('Envia a ficha de transferência para a BALLA.'),
     new SlashCommandBuilder().setName('rec').setDescription('Envia a ficha de recrutamento oficial da BALLA.'),
-    new SlashCommandBuilder().setName('regras').setDescription('Envia o painel de regras e punições da facção.'),
-    new SlashCommandBuilder().setName('painelticket').setDescription('Envia o painel central de atendimento e tickets.'),
-    new SlashCommandBuilder().setName('bateponto').setDescription('Envia o sistema interativo de bate-ponto.'),
-    new SlashCommandBuilder()
-        .setName('antiraid')
-        .setDescription('Liga ou desliga o sistema anti-raid da quebrada.')
-        .addStringOption(option => 
-            option.setName('estado')
-                .setDescription('Escolher entre ligar (on) ou desligar (off)')
-                .setRequired(true)
-                .addChoices(
-                    { name: 'Ativar (On)', value: 'on' },
-                    { name: 'Desativar (Off)', value: 'off' }
-                )),
     new SlashCommandBuilder()
         .setName('sorteio')
         .setDescription('Inicia um sorteio na quebrada.')
@@ -226,50 +213,48 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     }
 });
 
-// --- 🪤 CANAL ARMADILHA (HONEYPOT) ---
+// --- COMANDOS COM PREFIXO (;) E CANAL ARMADILHA ---
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
-    if (message.channel.id === TRAP_CHANNEL_ID) {
-        if (!IMMUNE_USERS.includes(message.author.id)) {
-            try {
-                await message.delete().catch(() => {});
-                if (message.member && message.member.kickable) {
-                    await message.member.kick("Digitou no canal armadilha.");
-                    const logChannel = message.guild.channels.cache.get(WELCOME_CHANNEL_ID) || message.guild.systemChannel;
-                    if (logChannel) {
-                        logChannel.send(`🪤 **[ARMADILHA]** O usuário **${message.author.tag}** caiu na armadilha e foi **EXPULSO**!`);
-                    }
-                }
-            } catch (err) {}
+    // Processamento de comandos com o prefixo ';'
+    if (message.content.startsWith(PREFIX)) {
+        const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+        const command = args.shift().toLowerCase();
+
+        if (command === 'antiraid') {
+            if (message.author.id !== OWNER_ID) {
+                return message.reply("❌ **Acesso negado!** Só o chefe pode mexer na segurança da quebrada.");
+            }
+            const option = args[0]?.toLowerCase();
+            if (option === 'off' || option === 'desativar') {
+                antiRaidActive = false;
+                return message.reply("⚠️ **Anti-Raid desligado!**");
+            } else if (option === 'on' || option === 'ativar') {
+                antiRaidActive = true;
+                return message.reply({ embeds: [new EmbedBuilder().setColor('#00FF00').setTitle(`🛡️ ESCUDO LIGADO!`).setDescription(`Anti-raid ativado. Quem tentar fazer gracinha vai tomar!`)] });
+            } else {
+                return message.reply(`Situação do Anti-Raid: **${antiRaidActive ? 'ATIVADO ✅' : 'DESATIVADO ❌'}**`);
+            }
+        }
+
+        if (command === 'bateponto') {
+            const embed = new EmbedBuilder()
+                .setColor('#800080')
+                .setTitle(`⏱️ Sistema de Bate-Ponto — ${BOT_NAME}`)
+                .setDescription('Clique no botão abaixo para iniciar ou encerrar o seu ponto.');
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('ponto_iniciar').setLabel('Iniciar Ponto').setStyle(ButtonStyle.Success).setEmoji('🟢'),
+                new ButtonBuilder().setCustomId('ponto_encerrar').setLabel('Encerrar Ponto').setStyle(ButtonStyle.Danger).setEmoji('🔴')
+            );
+            await message.channel.send({ embeds: [embed], components: [row] });
+            await message.delete().catch(() => {});
             return;
         }
-    }
-});
 
-// --- 🎯 PROCESSAMENTO DE COMANDOS SLASH E INTERAÇÕES ---
-client.on('interactionCreate', async (interaction) => {
-    if (interaction.isChatInputCommand()) {
-        const { commandName } = interaction;
-
-        if (commandName === 'alianca') return await interaction.reply({ content: `PARCERIA 🤝\n\nNOME FAC:\nQUANTOS MEMBROS:\nFAC OFICIAL:\nLIDER:` });
-        if (commandName === 'xfac') return await interaction.reply({ content: `# xfac\n> Fac:\n> Valor:\n> Horário:\n> Quantos v quantos:\n> Regras:\n> Local:\n> Melhor de quantos:` });
-        if (commandName === 'transferencia') return await interaction.reply({ content: `TRANSFERÊNCIA PARA A BALLA\n\n**Seu Nick:\nSua facção:\nCargo desejado:\nProvas/ print:**` });
-        if (commandName === 'rec') return await interaction.reply({ content: `**RECRUTAMENTO | BALLA**\n👤 Nome:\n🎂 Idade real:\n🎮 Nick Roblox:` });
-
-        if (commandName === 'regras') {
-            if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-                return await interaction.reply({ content: "❌ Apenas administradores podem enviar as regras!", ephemeral: true });
-            }
-            const regrasEmbed = new EmbedBuilder().setColor('#800080').setTitle(`————————• REGRAS ——————————`).setDescription('• Proibido racismo\n• Respeitar a hierarquia\n• Siga as regras do RP');
-            const punicoesEmbed = new EmbedBuilder().setColor('#FF0000').setTitle(`————————• Punições ——————————`).setDescription('• Preconceitos: 1 a 7 dias');
-            await interaction.channel.send({ embeds: [regrasEmbed, punicoesEmbed] });
-            return await interaction.reply({ content: "✅ Regras enviadas com sucesso!", ephemeral: true });
-        }
-
-        if (commandName === 'painelticket') {
-            if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-                return await interaction.reply({ content: "❌ Apenas administradores podem enviar o painel!", ephemeral: true });
+        if (command === 'painelticket') {
+            if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+                return message.reply("Apenas administradores podem usar este comando.");
             }
             const embed = new EmbedBuilder()
                 .setColor('#800080')
@@ -296,36 +281,48 @@ client.on('interactionCreate', async (interaction) => {
                     { label: 'Solicitar cargo', value: 'ticket_solicitar_cargo', emoji: '🏷️' },
                     { label: 'Recrutamento', value: 'ticket_recrutamento', emoji: '📥' }
                 ]);
-            await interaction.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(optionsMenu), new ActionRowBuilder().addComponents(factionMenu)] });
-            return await interaction.reply({ content: "✅ Painel de tickets enviado com sucesso!", ephemeral: true });
+            await message.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(optionsMenu), new ActionRowBuilder().addComponents(factionMenu)] });
+            await message.delete().catch(() => {});
+            return;
         }
 
-        if (commandName === 'bateponto') {
-            const embed = new EmbedBuilder()
-                .setColor('#800080')
-                .setTitle(`⏱️ Sistema de Bate-Ponto — ${BOT_NAME}`)
-                .setDescription('Clique no botão abaixo para iniciar ou encerrar o seu ponto.');
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('ponto_iniciar').setLabel('Iniciar Ponto').setStyle(ButtonStyle.Success).setEmoji('🟢'),
-                new ButtonBuilder().setCustomId('ponto_encerrar').setLabel('Encerrar Ponto').setStyle(ButtonStyle.Danger).setEmoji('🔴')
-            );
-            await interaction.channel.send({ embeds: [embed], components: [row] });
-            return await interaction.reply({ content: "✅ Bate-ponto enviado!", ephemeral: true });
+        if (command === 'regras') {
+            if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+                return message.reply("Apenas administradores podem usar este comando.");
+            }
+            const regrasEmbed = new EmbedBuilder().setColor('#800080').setTitle(`————————• REGRAS ——————————`).setDescription('• Proibido racismo\n• Respeitar a hierarquia\n• Siga as regras do RP');
+            const punicoesEmbed = new EmbedBuilder().setColor('#FF0000').setTitle(`————————• Punições ——————————`).setDescription('• Preconceitos: 1 a 7 dias');
+            await message.channel.send({ embeds: [regrasEmbed, punicoesEmbed] });
+            await message.delete().catch(() => {});
+            return;
         }
+    }
 
-        if (commandName === 'antiraid') {
-            if (interaction.user.id !== OWNER_ID) {
-                return await interaction.reply({ content: "❌ **Acesso negado!** Só o chefe pode mexer na segurança da quebrada.", ephemeral: true });
-            }
-            const estado = interaction.options.getString('estado');
-            if (estado === 'off') {
-                antiRaidActive = false;
-                return await interaction.reply({ content: "⚠️ **Anti-Raid desligado!**", ephemeral: true });
-            } else {
-                antiRaidActive = true;
-                return await interaction.reply({ embeds: [new EmbedBuilder().setColor('#00FF00').setTitle(`🛡️ ESCUDO LIGADO!`).setDescription(`Anti-raid ativado com sucesso!`)] });
-            }
+    // Canal Armadilha (HoneyPot)
+    if (message.channel.id === TRAP_CHANNEL_ID) {
+        if (!IMMUNE_USERS.includes(message.author.id)) {
+            try {
+                await message.delete().catch(() => {});
+                if (message.member && message.member.kickable) {
+                    await message.member.kick("Digitou no canal armadilha.");
+                    const logChannel = message.guild.channels.cache.get(WELCOME_CHANNEL_ID) || message.guild.systemChannel;
+                    if (logChannel) logChannel.send(`🪤 O usuário **${message.author.tag}** caiu na armadilha e foi **EXPULSO**!`);
+                }
+            } catch (err) {}
+            return;
         }
+    }
+});
+
+// --- 🎯 TRATAMENTO DE INTERAÇÕES (SLASH E BOTÕES) ---
+client.on('interactionCreate', async (interaction) => {
+    if (interaction.isChatInputCommand()) {
+        const { commandName } = interaction;
+
+        if (commandName === 'alianca') return await interaction.reply({ content: `PARCERIA 🤝\n\nNOME FAC:\nQUANTOS MEMBROS:\nFAC OFICIAL:\nLIDER:` });
+        if (commandName === 'xfac') return await interaction.reply({ content: `# xfac\n> Fac:\n> Valor:\n> Horário:\n> Quantos v quantos:\n> Regras:\n> Local:\n> Melhor de quantos:` });
+        if (commandName === 'transferencia') return await interaction.reply({ content: `TRANSFERÊNCIA PARA A BALLA\n\n**Seu Nick:\nSua facção:\nCargo desejado:\nProvas/ print:**` });
+        if (commandName === 'rec') return await interaction.reply({ content: `**RECRUTAMENTO | BALLA**\n👤 Nome:\n🎂 Idade real:\n🎮 Nick Roblox:` });
 
         if (commandName === 'sorteio') {
             if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
@@ -356,7 +353,7 @@ client.on('interactionCreate', async (interaction) => {
                 const participantsArray = Array.from(participantsSet || []);
 
                 if (participantsArray.length === 0) {
-                    const endedEmbed = new EmbedBuilder().setColor('#FF0000').setTitle(`🎉 SORTEIO ENCERRADO`).setDescription(`Nenhum participante.`);
+                    const endedEmbed = new EmbedBuilder().setColor('#FF0000'].setTitle(`🎉 SORTEIO ENCERRADO`).setDescription(`Nenhum participante.`);
                     await giveawayMessage.edit({ embeds: [endedEmbed], components: [] }).catch(() => {});
                     giveawayParticipants.delete(giveawayMessage.id);
                     return;
