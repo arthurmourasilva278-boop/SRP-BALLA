@@ -213,11 +213,10 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     }
 });
 
-// --- COMANDOS COM PREFIXO (;) E CANAL ARMADILHA ---
+// --- COMANDOS COM O PREFIXO (;) E CANAL ARMADILHA ---
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
-    // Processamento de comandos com o prefixo ';'
     if (message.content.startsWith(PREFIX)) {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
         const command = args.shift().toLowerCase();
@@ -353,7 +352,7 @@ client.on('interactionCreate', async (interaction) => {
                 const participantsArray = Array.from(participantsSet || []);
 
                 if (participantsArray.length === 0) {
-                    const endedEmbed = new EmbedBuilder().setColor('#FF0000'].setTitle(`🎉 SORTEIO ENCERRADO`).setDescription(`Nenhum participante.`);
+                    const endedEmbed = new EmbedBuilder().setColor('#FF0000').setTitle(`🎉 SORTEIO ENCERRADO`).setDescription(`Nenhum participante.`);
                     await giveawayMessage.edit({ embeds: [endedEmbed], components: [] }).catch(() => {});
                     giveawayParticipants.delete(giveawayMessage.id);
                     return;
