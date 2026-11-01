@@ -61,7 +61,7 @@ const MIN_ACCOUNT_AGE = 7 * 24 * 60 * 60 * 1000;
 const CHANNEL_CREATION_LIMIT = 3; 
 const CHANNEL_CREATION_TIME = 5000; 
 
-// --- ⚡ DEFINIÇÃO DE TODOS OS COMANDOS (AGORA 100% SLASH /) ---
+// --- ⚡ DEFINIÇÃO DE TODOS OS COMANDOS SLASH ---
 const commands = [
     new SlashCommandBuilder().setName('alianca').setDescription('Envia a ficha de parceria/aliança.'),
     new SlashCommandBuilder().setName('xfac').setDescription('Envia a ficha de desafio Xfac.'),
@@ -88,14 +88,18 @@ const commands = [
         .addIntegerOption(option => option.setName('tempo').setDescription('Duração do sorteio em minutos').setRequired(true))
 ].map(command => command.toJSON());
 
-client.once('clientReady', async () => {
+client.once('ready', async () => {
     console.log(`Bot ${BOT_NAME} ligado com segurança avançada como ${client.user.tag}!`);
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try {
         console.log('A registrar comandos Slash (/)...');
-        await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-        console.log('Comandos Slash registados com sucesso!');
+        // Registo direto e instantâneo por guild para aparecer imediatamente no servidor
+        const guilds = client.guilds.cache.map(guild => guild.id);
+        for (const guildId of guilds) {
+            await rest.put(Routes.applicationGuildCommands(client.user.id, guildId), { body: commands });
+        }
+        console.log('Comandos Slash registados com sucesso em todos os servidores!');
     } catch (error) {
         console.error('Erro ao registrar comandos Slash:', error);
     }
@@ -178,7 +182,6 @@ client.on('guildMemberRemove', async (member) => {
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
 
-    // Canal Armadilha (HoneyPot)
     if (message.channel.id === TRAP_CHANNEL_ID) {
         if (!IMMUNE_USERS.includes(message.author.id)) {
             try {
@@ -194,7 +197,7 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// --- 🎯 TRATAMENTO DE INTERAÇÕES (TODOS OS COMANDOS SLASH /) ---
+// --- 🎯 TRATAMENTO DE INTERAÇÕES (COMANDOS SLASH) ---
 client.on('interactionCreate', async (interaction) => {
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
