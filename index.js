@@ -15,7 +15,7 @@ const {
 } = require('discord.js');
 const express = require('express');
 
-// --- 🌐 SERVIDOR WEB PARA O RENDER (MANTÉM O BOT ACASO ONLINE) ---
+// --- 🌐 SERVIDOR WEB PARA O RENDER (MANTÉM O BOT ONLINE) ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -43,6 +43,11 @@ const PREFIX = ";";
 const ROLE_BOOSTER_ID = "1565957334507987054";
 const WELCOME_CHANNEL_ID = "1565919892291584030";
 const OWNER_ID = "1230674913564823562"; 
+
+// --- IDs DOS CANAIS DE RELATÓRIO ---
+const CHANNEL_TICKET_NORMAL = "1566183608182509808";
+const CHANNEL_TICKET_RECRUTAMENTO = "1566173997203202058";
+const CHANNEL_TRANSFERENCIA = "1566158426097324122";
 
 // --- Configuração da Armadilha (HoneyPot) e Exceções ---
 const TRAP_CHANNEL_ID = "1565934311985782974";
@@ -323,6 +328,27 @@ client.on('messageCreate', async (message) => {
             return;
         }
 
+        // --- PAINEL DE TRANSFERÊNCIA COM DUAS OPÇÕES (BOT / MANUAL) ---
+        if (command === 'paineltransferencia') {
+            if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+                return message.reply("Apenas administradores podem usar este comando.");
+            }
+
+            const embed = new EmbedBuilder()
+                .setColor('#800080')
+                .setTitle(`🔄 Painel de Transferência — ${BOT_NAME}`)
+                .setDescription('Escolha abaixo como deseja realizar o seu procedimento de transferência para a BALLA.');
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('transfer_bot_send').setLabel('Bot enviar mensagem').setStyle(ButtonStyle.Primary).setEmoji('🤖'),
+                new ButtonBuilder().setCustomId('transfer_manual').setLabel('Fazer manualmente').setStyle(ButtonStyle.Secondary).setEmoji('📝')
+            );
+
+            await message.channel.send({ embeds: [embed], components: [row] });
+            await message.delete().catch(() => {});
+            return;
+        }
+
         if (command === 'regras') {
             if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
                 return message.reply("Apenas administradores podem usar este comando.");
@@ -377,7 +403,7 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// --- 🎯 TRATAMENTO DE INTERAÇÕES (COMANDOS SLASH, BOTÕES E MENUS DE TICKETS) ---
+// --- 🎯 TRATAMENTO DE INTERAÇÕES (COMANDOS SLASH, BOTÕES E MENUS) ---
 client.on('interactionCreate', async (interaction) => {
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
@@ -460,6 +486,8 @@ client.on('interactionCreate', async (interaction) => {
 
     if (interaction.isButton()) {
         const userId = interaction.user.id;
+        const guild = interaction.guild;
+        const member = interaction.user;
 
         if (interaction.customId === 'join_giveaway') {
             const messageId = interaction.message.id;
@@ -474,6 +502,55 @@ client.on('interactionCreate', async (interaction) => {
 
             participantsSet.add(userId);
             return await interaction.reply({ content: `✅ Participação garantida com sucesso! Boa sorte no sorteio! 🍀`, ephemeral: true });
+        }
+
+        // --- INTERAÇÃO DO PAINEL DE TRANSFERÊNCIA (BOT VS MANUAL) ---
+        if (interaction.customId === 'transfer_bot_send' || interaction.customId === 'transfer_manual') {
+            const channelName = `ticket-transferencia-${member.username.toLowerCase()}`;
+            
+            // Verifica se o canal já existe
+            const existingChannel = guild.channels.cache.find(c => c.name === channelName);
+            if (existingChannel) {
+                return await interaction.reply({ content: `Você já possui um ticket de transferência aberto em ${existingChannel}!`, ephemeral: true });
+            }
+
+            try {
+                const ticketChannel = await guild.channels.create({
+                    name: channelName,
+                    type: ChannelType.GuildText,
+                    permissionOverwrites: [
+                        { id: guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+                        { id: member.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+                        { id: client.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels] }
+                    ]
+                });
+
+                const closeRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId('close_ticket').setLabel('Fechar Ticket').setStyle(ButtonStyle.Danger).setEmoji('🔒')
+                );
+
+                const transferEmbed = new EmbedBuilder()
+                    .setColor('#800080')
+                    .setTitle(`🔄 Ticket de Transferência`)
+                    .setDescription(
+                        interaction.customId === 'transfer_bot_send' 
+                            ? `Olá ${member}, solicitação automática gerada pelo bot. Preencha os dados da sua transferência abaixo e aguarde a equipe!` 
+                            : `Olá ${member}, ticket de transferência manual aberto. Informe os detalhes para prosseguir com a equipe.`
+                    );
+
+                await ticketChannel.send({ content: `${member}`, embeds: [transferEmbed], components: [closeRow] });
+
+                // Envia relatório para o canal configurado de transferência
+                const relatorioChannel = guild.channels.cache.get(CHANNEL_TRANSFERENCIA);
+                if (relatorioChannel) {
+                    relatorioChannel.send(`📂 **Novo Ticket de Transferência**\n👤 Usuário: ${member} (\`${member.id}\`)\n📍 Canal: ${ticketChannel}`);
+                }
+
+                return await interaction.reply({ content: `✅ Seu ticket de transferência foi criado com sucesso: ${ticketChannel}`, ephemeral: true });
+            } catch (err) {
+                console.error(err);
+                return await interaction.reply({ content: `❌ Ocorreu um erro ao criar o ticket de transferência.`, ephemeral: true });
+            }
         }
 
         if (interaction.customId === 'ponto_iniciar') {
