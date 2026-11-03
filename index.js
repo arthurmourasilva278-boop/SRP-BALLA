@@ -64,15 +64,18 @@ const BLACKLISTED_USERS = [
     "1537041179240173589"
 ];
 
-// --- 🛡️ SISTEMA ANTI-RAID E PROTEÇÕES ---
+// --- 🛡️ SISTEMA ANTI-RAID E PROTEÇÕES (Spam de Canais e Spam de Mensagens) ---
 let antiRaidActive = true; 
 const channelCreations = new Map();
+const messageSpam = new Map(); // Controle para spam de mensagens
 const activePoints = new Map();
 const giveawayParticipants = new Map();
 
-const MIN_ACCOUNT_AGE = 7 * 24 * 60 * 60 * 1000; // 7 dias
 const CHANNEL_CREATION_LIMIT = 3; 
 const CHANNEL_CREATION_TIME = 5000; 
+
+const MESSAGE_SPAM_LIMIT = 5; // Número máximo de mensagens seguidas
+const MESSAGE_SPAM_TIME = 4000; // Janela de tempo em milissegundos
 
 // --- ⚡ DEFINIÇÃO DOS COMANDOS SLASH ---
 const commands = [
@@ -103,11 +106,10 @@ client.once('ready', async () => {
     }
 });
 
-// --- 👋 EVENTO DE BOAS-VINDAS E VERIFICAÇÃO DE BLACKLIST / ANTI-RAID ---
+// --- 👋 EVENTO DE BOAS-VINDAS E VERIFICAÇÃO DE BLACKLIST ---
 client.on('guildMemberAdd', async (member) => {
     const guild = member.guild;
 
-    // Se o usuário estiver na Blacklist, bota pra fora imediatamente!
     if (BLACKLISTED_USERS.includes(member.id)) {
         try {
             await member.ban({ reason: "Blacklist: Usuário proibido de entrar no servidor." });
@@ -118,30 +120,6 @@ client.on('guildMemberAdd', async (member) => {
             return;
         } catch (e) {
             console.error("Erro ao banir usuário da blacklist:", e);
-        }
-    }
-
-    if (IMMUNE_USERS.includes(member.id)) return;
-
-    const now = Date.now();
-    if (antiRaidActive) {
-        const accountAge = now - member.user.createdTimestamp;
-        if (accountAge < MIN_ACCOUNT_AGE) {
-            try {
-                await member.kick("Anti-Raid Avançado: Conta muito nova (suspeita de bot/raid).");
-                const logChannel = guild.systemChannel || guild.channels.cache.get(WELCOME_CHANNEL_ID);
-                if (logChannel) {
-                    const griaEmbed = new EmbedBuilder()
-                        .setColor('#FF0000')
-                        .setTitle(`🚨 TRETAS DETECTADAS NO CORRE! 🚨`)
-                        .setDescription(`Anti-raid ativado. Quem tentar botar o louco não vai conseguir, vai ser kickado na hora!\n\n> **Maluco barrado:** ${member.user.tag}`)
-                        .setTimestamp();
-                    logChannel.send({ embeds: [griaEmbed] });
-                }
-                return; 
-            } catch (e) {
-                console.error("Erro ao expulsar conta nova:", e);
-            }
         }
     }
 
@@ -212,7 +190,7 @@ client.on('guildMemberRemove', async (member) => {
     }
 });
 
-// --- 🛡️ PROTEÇÃO CONTRA SPAM / CRIAÇÃO EM MASSA DE CANAIS ---
+// --- 🛡️ PROTEÇÃO CONTRA CRIAÇÃO EM MASSA DE CANAIS ---
 client.on('guildChannelCreate', async (channel) => {
     if (!antiRaidActive) return;
     const guild = channel.guild;
@@ -262,9 +240,42 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     }
 });
 
-// --- 💬 COMANDOS COM O PREFIXO (;) E CANAL ARMADILHA ---
+// --- 💬 COMANDOS, ANTI-SPAM DE MENSAGENS E CANAL ARMADILHA ---
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
+
+    // --- 🛡️ SISTEMA ANTI-SPAM DE MENSAGENS (FLOOD) ---
+    if (antiRaidActive && !IMMUNE_USERS.includes(message.author.id) && !message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+        const userId = message.author.id;
+        const now = Date.now();
+
+        if (!messageSpam.has(userId)) {
+            messageSpam.set(userId, []);
+        }
+
+        const userMessages = messageSpam.get(userId);
+        userMessages.push(now);
+
+        const windowStart = now - MESSAGE_SPAM_TIME;
+        const recentMessages = userMessages.filter(time => time > windowStart);
+        messageSpam.set(userId, recentMessages);
+
+        if (recentMessages.length >= MESSAGE_SPAM_LIMIT) {
+            try {
+                await message.delete().catch(() => {});
+                if (message.member && message.member.kickable) {
+                    await message.member.kick("Anti-Spam: Flood de mensagens no chat.");
+                    const alertChannel = message.guild.channels.cache.get(WELCOME_CHANNEL_ID) || message.guild.systemChannel;
+                    if (alertChannel) {
+                        alertChannel.send(`🚨 **[ANTI-SPAM]** O usuário **${message.author.tag}** tentou floodar o chat e foi **EXPULSO**! ⚡`);
+                    }
+                }
+            } catch (err) {
+                console.error("Erro no anti-spam de mensagens:", err);
+            }
+            return;
+        }
+    }
 
     if (message.content.startsWith(PREFIX)) {
         const args = message.content.slice(PREFIX.length).trim().split(/ +/);
@@ -283,7 +294,7 @@ client.on('messageCreate', async (message) => {
                 const ligadoEmbed = new EmbedBuilder()
                     .setColor('#00FF00')
                     .setTitle(`🛡️ ESCUDO LIGADO! A FIRMA TÁ BLINDADA! 🛡️`)
-                    .setDescription(`Anti-raid ativado. Quem tentar fazer gracinha não vai conseguir, vai ser kickado na hora e vai tomar!`);
+                    .setDescription(`Anti-raid de canais e anti-spam de mensagens ativados.`);
                 return message.reply({ embeds: [ligadoEmbed] });
             } else {
                 return message.reply(`Situação do Anti-Raid: **${antiRaidActive ? 'ATIVADO ✅' : 'DESATIVADO ❌'}**\nManda \`;antiraid on\` para blindar ou \`;antiraid off\` para desativar.`);
