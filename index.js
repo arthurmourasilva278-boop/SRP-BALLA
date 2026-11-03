@@ -42,6 +42,7 @@ const BOT_NAME = "SRP | BALLA";
 const PREFIX = ";";
 const ROLE_BOOSTER_ID = "1565957334507987054";
 const WELCOME_CHANNEL_ID = "1565919892291584030";
+const LEAVE_CHANNEL_ID = "1565919952215609524"; // ID do canal de saída configurado
 const OWNER_ID = "1230674913564823562"; 
 
 // --- IDs DOS CANAIS DE RELATÓRIO ---
@@ -146,10 +147,10 @@ client.on('guildMemberAdd', async (member) => {
     }
 });
 
-// --- 🚪 EVENTO DE SAÍDA / BANIMENTO DE MEMBROS ---
+// --- 🚪 EVENTO DE SAÍDA / BANIMENTO DE MEMBROS (ENVIADO NO CANAL DE SAÍDA CORRETO) ---
 client.on('guildMemberRemove', async (member) => {
     const guild = member.guild;
-    const channel = guild.channels.cache.get(WELCOME_CHANNEL_ID) || guild.systemChannel;
+    const channel = guild.channels.cache.get(LEAVE_CHANNEL_ID) || guild.channels.cache.get(WELCOME_CHANNEL_ID) || guild.systemChannel;
     if (!channel) return;
 
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -295,7 +296,7 @@ client.on('messageCreate', async (message) => {
                     'IMPORTANTE\n' +
                     '• Use o sistema de ticket apenas para questões que precisam de suporte'
                 )
-                .setFooter({ text: `Desenvolvido por krozz • ${BOT_NAME}` });
+                .setFooter({ text: BOT_NAME });
 
             const optionsMenu = new StringSelectMenuBuilder()
                 .setCustomId('menu_opcoes')
@@ -504,7 +505,7 @@ client.on('interactionCreate', async (interaction) => {
             return await interaction.reply({ content: `✅ Participação garantida com sucesso! Boa sorte no sorteio! 🍀`, ephemeral: true });
         }
 
-        // --- INTERAÇÃO DO PAINEL DE TRANSFERÊNCIA (MODELO COM SETINHAS) ---
+        // --- INTERAÇÃO DO PAINEL DE TRANSFERÊNCIA (FICHA EXATA COM SETINHAS) ---
         if (interaction.customId === 'transfer_bot_send' || interaction.customId === 'transfer_manual') {
             const channelName = `transferencia-${member.username.toLowerCase()}`;
             
@@ -528,7 +529,6 @@ client.on('interactionCreate', async (interaction) => {
                     new ButtonBuilder().setCustomId('close_ticket').setLabel('Fechar Ticket').setStyle(ButtonStyle.Danger).setEmoji('🔒')
                 );
 
-                // Modelo exato de relatório de transferência com setinhas solicitado
                 const transferText = 
                     `# RELATÓRIO DE TRANSFERÊNCIA ⬇️\n` +
                     `> 🙋🏻Superior : \n\n` +
@@ -592,7 +592,7 @@ client.on('interactionCreate', async (interaction) => {
                     { name: 'Termino:', value: `${dataFormatada}`, inline: false },
                     { name: 'Tempo total:', value: `${tempoTotalStr}`, inline: false }
                 )
-                .setFooter({ text: `Sistema desenvolvido pela krozz • ${BOT_NAME}` })
+                .setFooter({ text: BOT_NAME })
                 .setTimestamp();
 
             activePoints.delete(userId);
