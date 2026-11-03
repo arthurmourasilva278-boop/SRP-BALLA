@@ -504,11 +504,10 @@ client.on('interactionCreate', async (interaction) => {
             return await interaction.reply({ content: `✅ Participação garantida com sucesso! Boa sorte no sorteio! 🍀`, ephemeral: true });
         }
 
-        // --- INTERAÇÃO DO PAINEL DE TRANSFERÊNCIA (BOT VS MANUAL) ---
+        // --- INTERAÇÃO DO PAINEL DE TRANSFERÊNCIA (MODELO COM SETINHAS) ---
         if (interaction.customId === 'transfer_bot_send' || interaction.customId === 'transfer_manual') {
-            const channelName = `ticket-transferencia-${member.username.toLowerCase()}`;
+            const channelName = `transferencia-${member.username.toLowerCase()}`;
             
-            // Verifica se o canal já existe
             const existingChannel = guild.channels.cache.find(c => c.name === channelName);
             if (existingChannel) {
                 return await interaction.reply({ content: `Você já possui um ticket de transferência aberto em ${existingChannel}!`, ephemeral: true });
@@ -529,24 +528,24 @@ client.on('interactionCreate', async (interaction) => {
                     new ButtonBuilder().setCustomId('close_ticket').setLabel('Fechar Ticket').setStyle(ButtonStyle.Danger).setEmoji('🔒')
                 );
 
-                const transferEmbed = new EmbedBuilder()
-                    .setColor('#800080')
-                    .setTitle(`🔄 Ticket de Transferência`)
-                    .setDescription(
-                        interaction.customId === 'transfer_bot_send' 
-                            ? `Olá ${member}, solicitação automática gerada pelo bot. Preencha os dados da sua transferência abaixo e aguarde a equipe!` 
-                            : `Olá ${member}, ticket de transferência manual aberto. Informe os detalhes para prosseguir com a equipe.`
-                    );
+                // Modelo exato de relatório de transferência com setinhas solicitado
+                const transferText = 
+                    `# RELATÓRIO DE TRANSFERÊNCIA ⬇️\n` +
+                    `> 🙋🏻Superior : \n\n` +
+                    `> 🍬 Transferido : ${member}\n\n` +
+                    `> ⭐ Cargo em outra fac : \n\n` +
+                    `> ⭐ Cargo Entregado : \n\n` +
+                    `> 📃 Provas : abaixo\n\n` +
+                    `**Permissão**: <@&1559625846774300704>`;
 
-                await ticketChannel.send({ content: `${member}`, embeds: [transferEmbed], components: [closeRow] });
+                await ticketChannel.send({ content: `${member}\n${transferText}`, components: [closeRow] });
 
-                // Envia relatório para o canal configurado de transferência
                 const relatorioChannel = guild.channels.cache.get(CHANNEL_TRANSFERENCIA);
                 if (relatorioChannel) {
-                    relatorioChannel.send(`📂 **Novo Ticket de Transferência**\n👤 Usuário: ${member} (\`${member.id}\`)\n📍 Canal: ${ticketChannel}`);
+                    relatorioChannel.send(`📂 **Novo Ticket de Transferência Aberto!**\n👤 Usuário: ${member} (\`${member.id}\`)\n📍 Canal: ${ticketChannel}`);
                 }
 
-                return await interaction.reply({ content: `✅ Seu ticket de transferência foi criado com sucesso: ${ticketChannel}`, ephemeral: true });
+                return await interaction.reply({ content: `✅ O seu ticket de transferência foi criado com sucesso: ${ticketChannel}`, ephemeral: true });
             } catch (err) {
                 console.error(err);
                 return await interaction.reply({ content: `❌ Ocorreu um erro ao criar o ticket de transferência.`, ephemeral: true });
