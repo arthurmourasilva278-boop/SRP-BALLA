@@ -42,7 +42,7 @@ const BOT_NAME = "SRP | BALLA";
 const PREFIX = ";";
 const ROLE_BOOSTER_ID = "1565957334507987054";
 const WELCOME_CHANNEL_ID = "1565919892291584030";
-const LEAVE_CHANNEL_ID = "1565919952215609524"; // ID do canal de saída
+const LEAVE_CHANNEL_ID = "1565919952215609524"; 
 const OWNER_ID = "1230674913564823562"; 
 
 // --- IDs DOS CANAIS DE RELATÓRIO ---
@@ -50,12 +50,18 @@ const CHANNEL_TICKET_NORMAL = "1566183608182509808";
 const CHANNEL_TICKET_RECRUTAMENTO = "1566173997203202058";
 const CHANNEL_TRANSFERENCIA = "1566158426097324122";
 
-// --- Configuração da Armadilha (HoneyPot) e Exceções (Incluindo o ID do teu bot) ---
+// --- Configuração da Armadilha (HoneyPot) e Exceções ---
 const TRAP_CHANNEL_ID = "1565934311985782974";
 const IMMUNE_USERS = [
     "1230674913564823562", 
     "1166477445008998433", 
-    "1567076897639239790" // ID do bot de monitoramento adicionado aqui
+    "1567076897639239790" // Bot de monitoramento
+];
+
+// --- 🚫 LISTA DE IDS BLACKLIST (PROIBIDOS DE ENTRAR) ---
+const BLACKLISTED_USERS = [
+    "1546909201643741187",
+    "1537041179240173589"
 ];
 
 // --- 🛡️ SISTEMA ANTI-RAID E PROTEÇÕES ---
@@ -97,14 +103,27 @@ client.once('ready', async () => {
     }
 });
 
-// --- 👋 EVENTO DE BOAS-VINDAS E ANTI-RAID DE CONTAS NOVAS ---
+// --- 👋 EVENTO DE BOAS-VINDAS E VERIFICAÇÃO DE BLACKLIST / ANTI-RAID ---
 client.on('guildMemberAdd', async (member) => {
-    // Se o bot recém-entrado for o teu bot de monitoramento ou estiver imune, não faz nada
+    const guild = member.guild;
+
+    // Se o usuário estiver na Blacklist, bota pra fora imediatamente!
+    if (BLACKLISTED_USERS.includes(member.id)) {
+        try {
+            await member.ban({ reason: "Blacklist: Usuário proibido de entrar no servidor." });
+            const alertChannel = guild.channels.cache.get(WELCOME_CHANNEL_ID) || guild.systemChannel;
+            if (alertChannel) {
+                alertChannel.send(`🚨 **[SEGURANÇA]** O usuário banido **${member.user.tag}** (\`${member.id}\`) tentou entrar e foi **BANIDO** instantaneamente pela blacklist! 🔨⚡`);
+            }
+            return;
+        } catch (e) {
+            console.error("Erro ao banir usuário da blacklist:", e);
+        }
+    }
+
     if (IMMUNE_USERS.includes(member.id)) return;
 
-    const guild = member.guild;
     const now = Date.now();
-
     if (antiRaidActive) {
         const accountAge = now - member.user.createdTimestamp;
         if (accountAge < MIN_ACCOUNT_AGE) {
