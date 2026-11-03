@@ -42,7 +42,7 @@ const BOT_NAME = "SRP | BALLA";
 const PREFIX = ";";
 const ROLE_BOOSTER_ID = "1565957334507987054";
 const WELCOME_CHANNEL_ID = "1565919892291584030";
-const LEAVE_CHANNEL_ID = "1565919952215609524"; // ID do canal de saída configurado
+const LEAVE_CHANNEL_ID = "1565919952215609524"; // ID do canal de saída
 const OWNER_ID = "1230674913564823562"; 
 
 // --- IDs DOS CANAIS DE RELATÓRIO ---
@@ -50,9 +50,13 @@ const CHANNEL_TICKET_NORMAL = "1566183608182509808";
 const CHANNEL_TICKET_RECRUTAMENTO = "1566173997203202058";
 const CHANNEL_TRANSFERENCIA = "1566158426097324122";
 
-// --- Configuração da Armadilha (HoneyPot) e Exceções ---
+// --- Configuração da Armadilha (HoneyPot) e Exceções (Incluindo o ID do teu bot) ---
 const TRAP_CHANNEL_ID = "1565934311985782974";
-const IMMUNE_USERS = ["1230674913564823562", "1166477445008998433"];
+const IMMUNE_USERS = [
+    "1230674913564823562", 
+    "1166477445008998433", 
+    "1567076897639239790" // ID do bot de monitoramento adicionado aqui
+];
 
 // --- 🛡️ SISTEMA ANTI-RAID E PROTEÇÕES ---
 let antiRaidActive = true; 
@@ -95,6 +99,9 @@ client.once('ready', async () => {
 
 // --- 👋 EVENTO DE BOAS-VINDAS E ANTI-RAID DE CONTAS NOVAS ---
 client.on('guildMemberAdd', async (member) => {
+    // Se o bot recém-entrado for o teu bot de monitoramento ou estiver imune, não faz nada
+    if (IMMUNE_USERS.includes(member.id)) return;
+
     const guild = member.guild;
     const now = Date.now();
 
@@ -147,7 +154,7 @@ client.on('guildMemberAdd', async (member) => {
     }
 });
 
-// --- 🚪 EVENTO DE SAÍDA / BANIMENTO DE MEMBROS (ENVIADO NO CANAL DE SAÍDA CORRETO) ---
+// --- 🚪 EVENTO DE SAÍDA / BANIMENTO DE MEMBROS ---
 client.on('guildMemberRemove', async (member) => {
     const guild = member.guild;
     const channel = guild.channels.cache.get(LEAVE_CHANNEL_ID) || guild.channels.cache.get(WELCOME_CHANNEL_ID) || guild.systemChannel;
@@ -197,7 +204,7 @@ client.on('guildChannelCreate', async (channel) => {
         if (!channelLog) return;
 
         const { executor } = channelLog;
-        if (!executor || executor.bot || executor.id === OWNER_ID) return;
+        if (!executor || executor.bot || IMMUNE_USERS.includes(executor.id)) return;
 
         const now = Date.now();
         if (!channelCreations.has(executor.id)) {
@@ -505,7 +512,7 @@ client.on('interactionCreate', async (interaction) => {
             return await interaction.reply({ content: `✅ Participação garantida com sucesso! Boa sorte no sorteio! 🍀`, ephemeral: true });
         }
 
-        // --- INTERAÇÃO DO PAINEL DE TRANSFERÊNCIA (FICHA EXATA COM SETINHAS) ---
+        // --- INTERAÇÃO DO PAINEL DE TRANSFERÊNCIA ---
         if (interaction.customId === 'transfer_bot_send' || interaction.customId === 'transfer_manual') {
             const channelName = `transferencia-${member.username.toLowerCase()}`;
             
